@@ -1,2 +1,7 @@
-# how-to-train-your-chemeleon
-Pre-train your own CheMeleon Model
+<p align="center">
+  <img src="./flying_high.png" alt="Epic Banner" width="800"/>
+</p>
+
+<h2 align="center">
+  Train Your own CheMeleon Foundation Model from Scratch
+</h2>

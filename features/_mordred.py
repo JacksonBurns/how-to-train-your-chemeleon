@@ -1,108 +1,128 @@
 """
 features.py
 
-Calculates the mordred descriptors for a file of SMILES strings, writes them
-as float32 to a zarr file
+Streaming Mordred descriptor computation:
+- ProcessPoolExecutor
+- threadpoolctl limits BLAS threads to 1
+- End-to-end chunk processing in workers
+- Single pass, no buffering
+- Invalid SMILES leave NaN rows in Zarr
 """
 
 import sys
-from multiprocessing import Pool
 import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
-from rdkit import rdBase
-from mordred import Calculator, descriptors
-from rdkit.Chem import MolFromSmiles, RemoveHs
-from tqdm import tqdm
 import zarr
+from tqdm import tqdm
+
+from threadpoolctl import threadpool_limits
+
+from rdkit import rdBase
+from rdkit.Chem import MolFromSmiles, RemoveHs
+from mordred import Calculator, descriptors
 
 from .get_chunksize import get_chunk_rows
 
-warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-# convert to mols, filtering invalid
-def _f(smi):
-    mol = MolFromSmiles(smi)
-    if mol is None:
-        return False
-    try:
-        _ = RemoveHs(mol, updateExplicitCount=True)
-    except:
-        print(f"Skipping mol {smi} - failed RemoveHs")
-        return False
-    return True
+def process_chunk(start_idx, smiles_chunk, n_features):
+    """
+    Processes a chunk and returns:
+    (start_idx, feature_block)
 
-# convert to mols
-def _s(smi):
-    return MolFromSmiles(smi)
+    feature_block shape = (len(chunk), n_features)
+    Invalid rows are left as NaN.
+    """
+
+    with threadpool_limits(limits=1):
+        calc = Calculator(descriptors, ignore_3D=True)
+        calc.config(timeout=1)
+
+        n = len(smiles_chunk)
+        feats = np.full((n, n_features), np.nan, dtype=np.float32)
+
+        for i, smi in enumerate(smiles_chunk):
+            # cheap filters first
+            if len(smi) >= 150 or "." in smi:
+                continue
+
+            mol = MolFromSmiles(smi)
+            if mol is None:
+                continue
+
+            try:
+                RemoveHs(mol, updateExplicitCount=True)
+            except Exception:
+                continue
+
+            mol.SetProp("_Name", "")
+
+            try:
+                row = (
+                    calc.pandas([mol], quiet=True, nproc=1)
+                    .fill_missing()
+                    .to_numpy(dtype=np.float32)
+                )
+                feats[i, :] = row[0]
+            except Exception:
+                # leave as NaN on any failure
+                continue
+
+        return start_idx, feats
 
 
 if __name__ == "__main__":
-    p = Pool(64)
-
-    calc = Calculator(descriptors, ignore_3D=True)
-    calc.config(timeout=1)
-
-    n_features = len(calc)
-
     blocker = rdBase.BlockLogs()
+
     try:
         smiles_file = sys.argv[1]
         out_file = sys.argv[2]
-    except:
-        print("Usage: python features.py SMILES_FILE OUTPUT_PATH")
-        exit(1)
+    except Exception:
+        print("Usage: python _mordred.py SMILES_FILE OUTPUT_PATH")
+        sys.exit(1)
 
-    with open(smiles_file, "r") as file:
-        smiles = [i.strip() for i in tqdm(file.readlines(), "Reading SMILES")]
+    # Read SMILES
+    with open(smiles_file, "r") as f:
+        smiles = [line.strip() for line in tqdm(f, desc="Reading SMILES")]
 
-    # monomethyl auristatin E (one of the largest small molecule drugs) has a SMILES string
-    # with 143 characters - let's filter out anything much larger than that
-    cutoff = 150
-    smiles = list(filter(lambda s: len(s) < cutoff, tqdm(smiles, desc=f"Filtering SMILES > {cutoff} chars.")))
-
-    # filter out mixtures
-    smiles = list(filter(lambda s: "." not in s, tqdm(smiles, desc=f"Filtering mixture SMILES")))
-
-    valid_mols = list(p.map(_f, tqdm(smiles, desc="Generating RDKit mols"), chunksize=1_024))
-
-    smiles = [s for (s, v) in zip(smiles, valid_mols) if v]
-    with open("cleaned_" + smiles_file, "w") as file:
-        for smi in tqdm(smiles, desc="Writing cleaned SMILES"):
-            file.write(smi + "\n")
     n_mols = len(smiles)
 
-    # Define array dimensions
-    shape = (n_mols, n_features)
+    # Precompute feature dimension
+    calc = Calculator(descriptors, ignore_3D=True)
+    n_features = len(calc)
+
+    # Chunking
     dtype = np.float32
     chunk_rows = get_chunk_rows(dtype, n_features)
-    chunk_shape = (chunk_rows, n_features)
-    print(f"Number of rows per chunk: {chunk_rows}")
+    print(f"Rows per chunk: {chunk_rows}")
 
-    # Create the dataset with compression and concurrency settings
     z = zarr.create_array(
         store=out_file,
-        shape=shape,
-        chunks=chunk_shape,
+        shape=(n_mols, n_features),
+        chunks=(chunk_rows, n_features),
         dtype=dtype,
-        compressors=None,  # disable compression
+        compressors=None,
         fill_value=np.nan,
     )
 
-    i = 0
-    with tqdm(total=n_mols, desc="Calculating features") as pbar:
-        while i < n_mols:
-            mols = list(p.map(_s, smiles[i:i+chunk_rows], chunksize=chunk_rows // 64))
-            for mol in mols:
-                mol.SetProp("_Name", "")  # prevent mordred from doing this in a rather expensive way
-            batch = calc.pandas(mols, quiet=True, nproc=64).fill_missing().to_numpy(dtype=np.float32)
-            z[i:i+chunk_rows, :] = batch
-            pbar.update(chunk_rows)
-            i += chunk_rows
-        mols = list(p.map(_s, smiles[i-chunk_rows:n_mols], chunksize=chunk_rows // 64))
-        for mol in mols:
-            mol.SetProp("_Name", "")  # prevent mordred from doing this in a rather expensive way
-        batch = calc.pandas(mols, quiet=True, nproc=64).fill_missing().to_numpy(dtype=np.float32)
-        z[i-chunk_rows:n_mols, :] = batch
-        pbar.update(n_mols - (i-chunk_rows))
+    # Submit chunks
+    with ProcessPoolExecutor(max_workers=64) as executor:
+        futures = []
+
+        for start in range(0, n_mols, chunk_rows):
+            chunk = smiles[start : start + chunk_rows]
+            futures.append(
+                executor.submit(process_chunk, start, chunk, n_features)
+            )
+
+        # Consume as they complete (out-of-order OK, they are written to correct location by start_idx)
+        with tqdm(total=n_mols, desc="Calculating features") as pbar:
+            for fut in as_completed(futures):
+                start_idx, feats = fut.result()
+                n = feats.shape[0]
+
+                z[start_idx : start_idx + n, :] = feats
+                pbar.update(n)

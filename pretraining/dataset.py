@@ -8,7 +8,7 @@ from chemprop.data.collate import TrainingBatch, BatchMolGraph
 
 
 
-class ChemPropChunkwiseZarrDataset(torch.utils.data.Dataset):
+class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
     def __init__(self, smiles: list[str], zarr_store: str, featurizer: SimpleMoleculeMolGraphFeaturizer):
         self.smiles = np.array(smiles)
         self.z = zarr.open_array(zarr_store)
@@ -22,9 +22,8 @@ class ChemPropChunkwiseZarrDataset(torch.utils.data.Dataset):
         return self.len
 
     def __getitem__(self, idx: int):
-        # final chunk may not be full size, so we need to calculate the actual size of this batch
         start_idx = idx * self.chunksize
-        stop_idx = min(start_idx + self.chunksize, self.n_rows)
+        stop_idx = start_idx + self.chunksize
         return TrainingBatch(
             BatchMolGraph([self.featurizer(MolFromSmiles(s)) for s in self.smiles[start_idx:stop_idx]]),
             None,

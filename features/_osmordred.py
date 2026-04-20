@@ -5,7 +5,7 @@ import osmordred as rd
 from rdkit import Chem
 from rdkit.Chem import Mol
 
-from .get_chunksize import get_chunk_rows
+from get_chunksize import get_chunk_rows
 
 logger = logging.getLogger(__name__)
 
@@ -3781,8 +3781,8 @@ if __name__ == "__main__":
 
     with BlockLogs():
         try:
-            in_file = sys.argv[1]
-            out_file = sys.argv[2]
+            in_file = Path(sys.argv[1])
+            out_file = Path(sys.argv[2])
             i = int(sys.argv[3])
         except:
             print("usage: python _osmordred.py </path/to/input_file.parquet> </path/to/output_file.zarr> <start_index>")
@@ -3791,8 +3791,7 @@ if __name__ == "__main__":
         df = (
             pl.read_parquet(in_file)
             .filter(pl.col("SMILES").str.len_chars() < 100)  # can't do some of the lapack heavy descs on huge molecules
-            .sample(fraction=0.50, seed=42)
-        )  # our disks aren't big enough for this dataset lmao
+        )
 
         smiles = df["SMILES"].to_list()
         # Run RDKit validation in parallel across all cores
@@ -3805,8 +3804,8 @@ if __name__ == "__main__":
                 )
             )
 
-        # write these only
-        pl.DataFrame({"SMILES": cleaned_smiles}).write_parquet("molpile_smiles_filtered.parquet")
+        # write these
+        pl.DataFrame({"SMILES": cleaned_smiles}).write_parquet(out_file.parent / f"{in_file.stem}_validated_smiles.parquet")
         del smiles, cleaned_smiles
 
         n_mols = df.shape[0]

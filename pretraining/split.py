@@ -6,7 +6,7 @@ import polars
 import zarr
 from tqdm import tqdm
 
-from .config import WINSORIZATION_FACTOR
+from config import WINSORIZATION_FACTOR
 
 
 def combine_stats(stat_a, stat_b):
@@ -173,6 +173,8 @@ if __name__ == "__main__":
         if response != "y":
             print("Operation cancelled.")
             exit(1)
+    else:
+        outdir_path.mkdir(parents=True)
 
     input_zarr = zarr.open(input_path, mode="r")
     input_n_chunks = input_zarr.nchunks

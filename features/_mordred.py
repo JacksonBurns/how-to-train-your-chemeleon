@@ -21,7 +21,7 @@ from rdkit.Chem import MolFromSmiles, RemoveHs
 from threadpoolctl import threadpool_limits
 from tqdm import tqdm
 
-from .get_chunksize import get_chunk_rows
+from get_chunksize import get_chunk_rows
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 

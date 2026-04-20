@@ -1,23 +1,24 @@
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import polars
 import torch
 import zarr
 from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from chemprop.featurizers.atom import RIGRAtomFeaturizer
-from chemprop.featurizers.bond import RIGRBondFeaturizer
+from chemprop.featurizers.atom import RIGRAtomFeaturizer, MultiHotAtomFeaturizer
+from chemprop.featurizers.bond import RIGRBondFeaturizer, MultiHotBondFeaturizer
 from chemprop.models import MPNN
 from chemprop.nn import BondMessagePassing, NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.utilities import rank_zero_info
+from lightning.pytorch.utilities import rank_zero_info, rank_zero_only
 from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
 
-from .config import (
+from config import (
     EPOCHS,
     FEATURIZER,
     FINAL_LEARNING_RATE,
@@ -32,8 +33,12 @@ from .config import (
     PATIENCE,
     WARMUP_EPOCHS,
 )
-from .dataset import ChempropChunkwiseZarrDataset
-from .random_dropout_mse import RandomDropoutMSE
+from dataset import ChempropChunkwiseZarrDataset
+from random_dropout_mse import RandomDropoutMSE
+
+
+NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
 
 if __name__ == "__main__":
     # shh
@@ -45,6 +50,32 @@ if __name__ == "__main__":
     except:
         print("usage: python train.py <input_dir> <output_dir>")
         exit(1)
+
+    if not input_dir.exists():
+        print(f"Error: {input_dir} not found.")
+        exit(1)
+
+    output_dir.mkdir(exist_ok=True)
+    output_dir = output_dir / NOW
+    output_dir.mkdir(exist_ok=True)
+    
+    # dump the input args and the config into this output directory for posterity
+    with open(output_dir / "config.txt", "w") as f:
+        f.write(f"input_dir: {input_dir}\n")
+        f.write(f"output_dir: {output_dir}\n")
+        f.write(f"EPOCHS: {EPOCHS}\n")
+        f.write(f"FEATURIZER: {FEATURIZER}\n")
+        f.write(f"FINAL_LEARNING_RATE: {FINAL_LEARNING_RATE}\n")
+        f.write(f"FNN_ACTIVATION: {FNN_ACTIVATION}\n")
+        f.write(f"FNN_HIDDEN_LAYERS: {FNN_HIDDEN_LAYERS}\n")
+        f.write(f"FNN_HIDDEN_SIZE: {FNN_HIDDEN_SIZE}\n")
+        f.write(f"INITIAL_LEARNING_RATE: {INITIAL_LEARNING_RATE}\n")
+        f.write(f"MAXIMUM_LEARNING_RATE: {MAXIMUM_LEARNING_RATE}\n")
+        f.write(f"MP_ACTIVATION: {MP_ACTIVATION}\n")
+        f.write(f"MP_DEPTH: {MP_DEPTH}\n")
+        f.write(f"MP_HIDDEN_SIZE: {MP_HIDDEN_SIZE}\n")
+        f.write(f"PATIENCE: {PATIENCE}\n")
+        f.write(f"WARMUP_EPOCHS: {WARMUP_EPOCHS}\n")
 
     training_store = input_dir / "train_rescaled.zarr"
     validation_store = input_dir / "val_rescaled.zarr"
@@ -58,8 +89,8 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    atom_featurizer = RIGRAtomFeaturizer() if FEATURIZER == "rigr" else None
-    bond_featurizer = RIGRBondFeaturizer() if FEATURIZER == "rigr" else None
+    atom_featurizer = RIGRAtomFeaturizer() if FEATURIZER == "rigr" else MultiHotAtomFeaturizer.v2()
+    bond_featurizer = RIGRBondFeaturizer() if FEATURIZER == "rigr" else MultiHotBondFeaturizer()
     featurizer = SimpleMoleculeMolGraphFeaturizer(atom_featurizer=atom_featurizer, bond_featurizer=bond_featurizer)
 
     train_dataset = ChempropChunkwiseZarrDataset(
@@ -86,7 +117,7 @@ if __name__ == "__main__":
         ),
         NormAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, hidden_dim=FNN_HIDDEN_SIZE, num_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE()
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE()
         ),
         metrics=[RandomDropoutMSE(), metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=INITIAL_LEARNING_RATE,
@@ -128,5 +159,5 @@ if __name__ == "__main__":
     ckpt_path = trainer.checkpoint_callback.best_model_path
     print(f"Reloading best model from checkpoint file: {ckpt_path}")
     model = model.__class__.load_from_checkpoint(ckpt_path, map_location="cpu")
-    trainer.test(model, val_dataloader)
+    trainer.validate(model, val_dataloader)
     torch.save(model, output_dir / "best.pt")

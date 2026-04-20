@@ -18,23 +18,24 @@ This version is _not_ a faithful reproduction of the original training code - it
 If you want to _exactly_ re-run the original code you should follow the link to the original script, otherwise the code that is in this repository is much better suited for making new `CheMeleon`-inspired models.
 
 This repository is laid out like this:
-<!-- 
-TODO: update the below !!
 
- - `random_dropout_mse.py`: the custom loss function used in `CheMeleon`, which randomly drops out a user-configurable fraction of the targets during training as a form of regularization.
- This one is slightly different from that in the original paper, as it allows us to _ignore_ missing features rather than imputing them, as was done in the original paper.
- - `features`: feature calculators used to generate the pre-training targets, as well as the corresponding Chemprop-compatible loaders for actually running training on those features.
- This repository includes the [OSmordred](https://github.com/osmoai/osmordred) feature calculator as well as the original [`mordred-community`](https://github.com/JacksonBurns/mordred-community) feature calculator from the `CheMeleon` paper.
-
-> **NOTE**
-> ~~There are two versions of the loader: a 'normal' version used in the original paper and a 'chunked' version.
-The latter loads chunks out of the serialized data array (in Zarr format) at a time, rather than accessing many random rows.
-This makes training roughly ~100x faster _but_ means that training is no longer _truly_ stochastic, and instead pseudo-random.
-This is included to help with scale - whether or not this approximation introduces too much error has not been verified.~~ <-- update this I removed the old one
-
- - `config.py`: exposes all of the hyperparameters that one might reasonably consider changing to effect the performance of `CheMeleon`.
- The original paper did very minimal tuning of these!
- - `train.py`: driver code to actually execute the training. -->
+```bash
+.
+├── features  # feature calculators
+│   ├── get_chunksize.py  # helper function to control number of rows per Zarr chunk to optimize performance
+│   ├── _mordred.py  # mordred-community-based feature calculator
+│   └── _osmordred.py  # osmordred-based feature calculator
+├── flying_high.png  # epic logo
+├── inference.sh  # demo script for running inference with your custom CheMeleon model
+├── LICENSE  # MIT license
+├── pretraining  # code for actually running trianing
+│   ├── config.py  # model hyperparams and training settings
+│   ├── dataset.py  # dataset class for loading from Zarr in a Chemprop-compatible way
+│   ├── random_dropout_mse.py  # random masking MSE used in the paper, re-written as a Chemprop-compatible loss function
+│   ├── split.py  # splits data into training and validation, then applies winsorization and rescaling
+│   └── train.py  # training driver script
+└── README.md  # this file
+```
 
 ## Hardware
 
@@ -42,9 +43,9 @@ This is included to help with scale - whether or not this approximation introduc
 
 ## Installation
 
-With `python==3.13` one just needs to `pip install 'chemprop>=2.2.3' zarr polars` and the corresponding feature calculator:
+With `python==3.13` one just needs to `pip install 'chemprop>=2.2.3' zarr polars pyarrow tensorboard` and the corresponding feature calculator:
 
- - `mordred-community`: `pip install mordred-community`.
+ - `mordred-community`: `pip install mordredcommunity`.
  - OSMordred: follow the installation instructions from [this fork](https://github.com/JacksonBurns/osmordred/tree/65e7dd40cc8209d695d98838dff2f34673251249) of the original repository, installing into a __separate__ environment from your other dependencies
 
 ## Usage

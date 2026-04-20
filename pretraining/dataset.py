@@ -7,7 +7,7 @@ from chemprop.data.collate import BatchMolGraph, TrainingBatch
 from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
 from rdkit.Chem import MolFromSmiles
 
-from .config import CHUNKS_PER_BATCH
+from config import CHUNKS_PER_BATCH
 
 
 class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):

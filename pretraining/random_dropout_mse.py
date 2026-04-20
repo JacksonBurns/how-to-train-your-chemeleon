@@ -1,7 +1,7 @@
 import torch
 from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 
-from .config import DROPOUT_FRACTION
+from config import DROPOUT_FRACTION
 
 
 @LossFunctionRegistry.register("rdmse")

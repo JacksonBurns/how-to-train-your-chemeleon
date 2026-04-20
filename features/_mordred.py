@@ -15,13 +15,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
 import zarr
-from tqdm import tqdm
-
-from threadpoolctl import threadpool_limits
-
+from mordred import Calculator, descriptors
 from rdkit import rdBase
 from rdkit.Chem import MolFromSmiles, RemoveHs
-from mordred import Calculator, descriptors
+from threadpoolctl import threadpool_limits
+from tqdm import tqdm
 
 from .get_chunksize import get_chunk_rows
 
@@ -61,11 +59,7 @@ def process_chunk(start_idx, smiles_chunk, n_features):
             mol.SetProp("_Name", "")
 
             try:
-                row = (
-                    calc.pandas([mol], quiet=True, nproc=1)
-                    .fill_missing()
-                    .to_numpy(dtype=np.float32)
-                )
+                row = calc.pandas([mol], quiet=True, nproc=1).fill_missing().to_numpy(dtype=np.float32)
                 feats[i, :] = row[0]
             except Exception:
                 # leave as NaN on any failure
@@ -114,9 +108,7 @@ if __name__ == "__main__":
 
         for start in range(0, n_mols, chunk_rows):
             chunk = smiles[start : start + chunk_rows]
-            futures.append(
-                executor.submit(process_chunk, start, chunk, n_features)
-            )
+            futures.append(executor.submit(process_chunk, start, chunk, n_features))
 
         # Consume as they complete (out-of-order OK, they are written to correct location by start_idx)
         with tqdm(total=n_mols, desc="Calculating features") as pbar:

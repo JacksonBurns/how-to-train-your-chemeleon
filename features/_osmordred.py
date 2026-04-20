@@ -1,10 +1,9 @@
 import logging
 
-
-from rdkit import Chem
 import numpy as np
-from rdkit.Chem import Mol
 import osmordred as rd
+from rdkit import Chem
+from rdkit.Chem import Mol
 
 from .get_chunksize import get_chunk_rows
 
@@ -3682,68 +3681,72 @@ def calculate(molecule: str | Mol) -> np.ndarray[DTYPE]:
         molecule = Chem.MolFromSmiles(molecule)
         if molecule is None:
             return np.full(DESCRIPTOR_COUNT, np.nan, dtype=DTYPE)
-    return np.concatenate((
-        _safe_calculate(rd.CalcABCIndex, molecule),
-        _safe_calculate(rd.CalcAcidBase, molecule),
-        _safe_calculate(rd.CalcAdjacencyMatrix, molecule, 2),
-        _safe_calculate(rd.CalcAromatic, molecule),
-        _safe_calculate(rd.CalcAtomCount, molecule, 2),
-        _safe_calculate(rd.CalcAutocorrelation, molecule),
-        _safe_calculate(rd.CalcBCUT, molecule),
-        _safe_calculate(rd.CalcBalabanJ, molecule),
-        _safe_calculate(rd.CalcBaryszMatrix, molecule),
-        _safe_calculate(rd.CalcBertzCT, molecule),
-        _safe_calculate(rd.CalcBondCount, molecule),
-        _safe_calculate(rd.CalcRNCGRPCG, molecule),
-        _safe_calculate(rd.CalcCarbonTypes, molecule, 2),
-        _safe_calculate(rd.CalcChi, molecule),
-        _safe_calculate(rd.CalcConstitutional, molecule),
-        _safe_calculate(rd.CalcDetourMatrix, molecule),
-        _safe_calculate(rd.CalcDistanceMatrix, molecule, 2),
-        _safe_calculate(rd.CalcEState, molecule, True),
-        _safe_calculate(rd.CalcEccentricConnectivityIndex, molecule),
-        _safe_calculate(rd.CalcExtendedTopochemicalAtom, molecule),
-        _safe_calculate(rd.CalcFragmentComplexity, molecule),
-        _safe_calculate(rd.CalcFramework, molecule),
-        _safe_calculate(rd.CalcHydrogenBond, molecule),
-        _safe_calculate(rd.CalcLogS, molecule),
-        _safe_calculate(rd.CalcInformationContent, molecule, 5),
-        _safe_calculate(rd.CalcKappaShapeIndex, molecule),
-        _safe_calculate(rd.CalcLipinski, molecule),
-        _safe_calculate(rd.CalcMcGowanVolume, molecule),
-        _safe_calculate(rd.CalcMoeType, molecule),
-        _safe_calculate(rd.CalcMolecularDistanceEdge, molecule),
-        _safe_calculate(rd.CalcMolecularId, molecule),
-        _safe_calculate(rd.CalcPathCount, molecule),
-        _safe_calculate(rd.CalcPolarizability, molecule),
-        _safe_calculate(rd.CalcRingCount, molecule),
-        _safe_calculate(rd.CalcRotatableBond, molecule),
-        _safe_calculate(rd.CalcSLogP, molecule),
-        _safe_calculate(rd.CalcTopoPSA, molecule),
-        _safe_calculate(rd.CalcTopologicalCharge, molecule),
-        _safe_calculate(rd.CalcTopologicalIndex, molecule),
-        _safe_calculate(rd.CalcVdwVolumeABC, molecule),
-        _safe_calculate(rd.CalcVertexAdjacencyInformation, molecule),
-        _safe_calculate(rd.CalcWalkCount, molecule),
-        _safe_calculate(rd.CalcWeight, molecule),
-        _safe_calculate(rd.CalcWienerIndex, molecule),
-        _safe_calculate(rd.CalcZagrebIndex, molecule),
-        _safe_calculate(rd.CalcPol, molecule),
-        _safe_calculate(rd.CalcMR, molecule),
-        _safe_calculate(rd.CalcFlexibility, molecule),
-        _safe_calculate(rd.CalcSchultz, molecule),
-        _safe_calculate(rd.CalcAlphaKappaShapeIndex, molecule),
-        _safe_calculate(rd.CalcHEState, molecule),
-        _safe_calculate(rd.CalcBEState, molecule),
-        _safe_calculate(rd.CalcAbrahams, molecule),
-        _safe_calculate(rd.CalcANMat, molecule),
-        _safe_calculate(rd.CalcASMat, molecule),
-        _safe_calculate(rd.CalcAZMat, molecule),
-        _safe_calculate(rd.CalcDSMat, molecule),
-        _safe_calculate(rd.CalcDN2Mat, molecule),
-        _safe_calculate(rd.CalcFrags, molecule),
-        _safe_calculate(rd.CalcAddFeatures, molecule),
-    ), dtype=DTYPE)
+    return np.concatenate(
+        (
+            _safe_calculate(rd.CalcABCIndex, molecule),
+            _safe_calculate(rd.CalcAcidBase, molecule),
+            _safe_calculate(rd.CalcAdjacencyMatrix, molecule, 2),
+            _safe_calculate(rd.CalcAromatic, molecule),
+            _safe_calculate(rd.CalcAtomCount, molecule, 2),
+            _safe_calculate(rd.CalcAutocorrelation, molecule),
+            _safe_calculate(rd.CalcBCUT, molecule),
+            _safe_calculate(rd.CalcBalabanJ, molecule),
+            _safe_calculate(rd.CalcBaryszMatrix, molecule),
+            _safe_calculate(rd.CalcBertzCT, molecule),
+            _safe_calculate(rd.CalcBondCount, molecule),
+            _safe_calculate(rd.CalcRNCGRPCG, molecule),
+            _safe_calculate(rd.CalcCarbonTypes, molecule, 2),
+            _safe_calculate(rd.CalcChi, molecule),
+            _safe_calculate(rd.CalcConstitutional, molecule),
+            _safe_calculate(rd.CalcDetourMatrix, molecule),
+            _safe_calculate(rd.CalcDistanceMatrix, molecule, 2),
+            _safe_calculate(rd.CalcEState, molecule, True),
+            _safe_calculate(rd.CalcEccentricConnectivityIndex, molecule),
+            _safe_calculate(rd.CalcExtendedTopochemicalAtom, molecule),
+            _safe_calculate(rd.CalcFragmentComplexity, molecule),
+            _safe_calculate(rd.CalcFramework, molecule),
+            _safe_calculate(rd.CalcHydrogenBond, molecule),
+            _safe_calculate(rd.CalcLogS, molecule),
+            _safe_calculate(rd.CalcInformationContent, molecule, 5),
+            _safe_calculate(rd.CalcKappaShapeIndex, molecule),
+            _safe_calculate(rd.CalcLipinski, molecule),
+            _safe_calculate(rd.CalcMcGowanVolume, molecule),
+            _safe_calculate(rd.CalcMoeType, molecule),
+            _safe_calculate(rd.CalcMolecularDistanceEdge, molecule),
+            _safe_calculate(rd.CalcMolecularId, molecule),
+            _safe_calculate(rd.CalcPathCount, molecule),
+            _safe_calculate(rd.CalcPolarizability, molecule),
+            _safe_calculate(rd.CalcRingCount, molecule),
+            _safe_calculate(rd.CalcRotatableBond, molecule),
+            _safe_calculate(rd.CalcSLogP, molecule),
+            _safe_calculate(rd.CalcTopoPSA, molecule),
+            _safe_calculate(rd.CalcTopologicalCharge, molecule),
+            _safe_calculate(rd.CalcTopologicalIndex, molecule),
+            _safe_calculate(rd.CalcVdwVolumeABC, molecule),
+            _safe_calculate(rd.CalcVertexAdjacencyInformation, molecule),
+            _safe_calculate(rd.CalcWalkCount, molecule),
+            _safe_calculate(rd.CalcWeight, molecule),
+            _safe_calculate(rd.CalcWienerIndex, molecule),
+            _safe_calculate(rd.CalcZagrebIndex, molecule),
+            _safe_calculate(rd.CalcPol, molecule),
+            _safe_calculate(rd.CalcMR, molecule),
+            _safe_calculate(rd.CalcFlexibility, molecule),
+            _safe_calculate(rd.CalcSchultz, molecule),
+            _safe_calculate(rd.CalcAlphaKappaShapeIndex, molecule),
+            _safe_calculate(rd.CalcHEState, molecule),
+            _safe_calculate(rd.CalcBEState, molecule),
+            _safe_calculate(rd.CalcAbrahams, molecule),
+            _safe_calculate(rd.CalcANMat, molecule),
+            _safe_calculate(rd.CalcASMat, molecule),
+            _safe_calculate(rd.CalcAZMat, molecule),
+            _safe_calculate(rd.CalcDSMat, molecule),
+            _safe_calculate(rd.CalcDN2Mat, molecule),
+            _safe_calculate(rd.CalcFrags, molecule),
+            _safe_calculate(rd.CalcAddFeatures, molecule),
+        ),
+        dtype=DTYPE,
+    )
+
 
 def _validate_smiles(smi: str) -> str:
     """Return SMILES if valid, else empty string."""
@@ -3754,6 +3757,7 @@ def _validate_smiles(smi: str) -> str:
     except Exception:
         return ""
 
+
 if __name__ == "__main__":
     # this uses osmordred, except modified to that anything that would be printed to std::cout instead goes to std:cerr
     # (done with vscode using (?<!//)std::cout ->> std::cerr regex-based search and replace)
@@ -3763,20 +3767,18 @@ if __name__ == "__main__":
     # python OSMOrdredCalculator.py molpile_smiles.parquet /datai/osmordred_molpile.zarr 2> /datai/molpile_osmordred_errors.log
     #
     # also, for functions using solveLinearSystem I have them throw an error instead of returning 5 zeros
+    import os
     import sys
+    from concurrent.futures import ProcessPoolExecutor
     from multiprocessing import Pool
     from pathlib import Path
 
-    from tqdm import tqdm
     import polars as pl
     import zarr
-    from rdkit.rdBase import BlockLogs
-    
     from rdkit import Chem
-    from concurrent.futures import ProcessPoolExecutor
-    import os
+    from rdkit.rdBase import BlockLogs
+    from tqdm import tqdm
 
-    
     with BlockLogs():
         try:
             in_file = sys.argv[1]
@@ -3786,9 +3788,11 @@ if __name__ == "__main__":
             print("usage: python _osmordred.py </path/to/input_file.parquet> </path/to/output_file.zarr> <start_index>")
             exit(1)
 
-        df = pl.read_parquet(in_file).filter(  # can't do some of the lapack heavy descs on huge molecules
-            pl.col("SMILES").str.len_chars() < 100).sample(
-                fraction=0.50, seed=42)  # our disks aren't big enough for this dataset lmao
+        df = (
+            pl.read_parquet(in_file)
+            .filter(pl.col("SMILES").str.len_chars() < 100)  # can't do some of the lapack heavy descs on huge molecules
+            .sample(fraction=0.50, seed=42)
+        )  # our disks aren't big enough for this dataset lmao
 
         smiles = df["SMILES"].to_list()
         # Run RDKit validation in parallel across all cores
@@ -3825,7 +3829,7 @@ if __name__ == "__main__":
             )
 
         p = Pool(64)
-        with tqdm(total=n_mols, initial=i,  desc=f"Calculating Features (batch size {chunk_rows})", file=sys.stdout) as pbar:
+        with tqdm(total=n_mols, initial=i, desc=f"Calculating Features (batch size {chunk_rows})", file=sys.stdout) as pbar:
             while i < n_mols:
                 z[i : i + chunk_rows, :] = np.stack(p.map(calculate, df["SMILES"][i : i + chunk_rows]))
                 pbar.update(chunk_rows)

@@ -9,12 +9,12 @@
 This repository contains code for training Chemprop-based foundation models in the style of [`CheMeleon`](https://github.com/jacksonburns/chemeleon), as described in [__Deep Learning Foundation Models from Classical Molecular Descriptors__](https://doi.org/10.48550/arXiv.2506.15792).
 If you just want to fine-tune `CheMeleon` on your dataset, you don't need the code in this repository - just add `--from-foundation CheMeleon` to your `chemprop train` command.
 
-> **NOTE**
+> [!NOTE]
 > Some familiarity with Python programming will be required to run this code - I've attempted to make it as general and re-usable as possible, but this is _not_ as straightforward as fine-tuning a `CheMeleon` model via Chemprop.
 You should expect to read through the `if __name__ == "__main__":` blocks in the code you are executing to understand roughly what I am accomplishing.
 
 The original `CheMeleon` pre-training script is a [mess](https://github.com/JacksonBurns/chemeleon/blob/60ea323cf278286e3fee1232f223a077ec3604c0/chemprop_foundation.py), so I've re-written it in this repository.
-This version is _not_ a faithful reproduction of the original training code - it includes various improvements and changes to improve feature calculation time, training time, and ease of use.
+This version is _not_ a faithful reproduction of the original training code - it includes various improvements (such as supporting the most current `chemprop` version) and changes to improve feature calculation time, training time (via chunk-wise data loading), and ease of use.
 If you want to _exactly_ re-run the original code you should follow the link to the original script, otherwise the code that is in this repository is much better suited for making new `CheMeleon`-inspired models.
 
 This repository is laid out like this:
@@ -39,7 +39,9 @@ This repository is laid out like this:
 
 ## Hardware
 
-
+GPU-accelerated training is highly recommended for this approach, even with the improvements to execution speed over the original code.
+Our original `CheMeleon` model was trained on 8 x NVIDIA 2080 Ti's and we have succesfully trained it on a single GPU (with increased patience).
+Notice that when setting the batch size, having multiple GPUs increases the batch size by _# GPUs_ - this can alter the performance!
 
 ## Installation
 

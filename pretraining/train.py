@@ -33,6 +33,7 @@ from config import (
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
+from multiweight_message_passing import MultiweightMessagePassing
 
 
 NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, shuffle=False, num_workers=4, persistent_workers=True)
 
     model = MPNN(
-        BondMessagePassing(
+        MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
             d_h=MP_HIDDEN_SIZE,

@@ -1,5 +1,5 @@
 # for data preparation
-WINSORIZATION_FACTOR = 6
+WINSORIZATION_FACTOR = 3
 
 # for training
 DROPOUT_FRACTION = 0.30

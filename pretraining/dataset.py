@@ -3,15 +3,14 @@ import math
 import numpy as np
 import torch
 import zarr
-from chemprop.data.collate import BatchMolGraph, TrainingBatch
-from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from rdkit.Chem import MolFromSmiles
+from chemprop.data.collate import TrainingBatch
+from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
 
 from config import CHUNKS_PER_BATCH
 
 
 class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
-    def __init__(self, smiles: list[str], zarr_store: str, featurizer: SimpleMoleculeMolGraphFeaturizer):
+    def __init__(self, smiles: list[str], zarr_store: str, featurizer: CuikmolmakerMolGraphFeaturizer):
         self.smiles = np.array(smiles)
         self.z = zarr.open_array(zarr_store)
         assert self.z.shape[0] == len(smiles), "Mismatched smiles and feature sizes"
@@ -39,7 +38,7 @@ class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
         weights = torch.ones((stop_idx - start_idx, 1), dtype=torch.float32)
 
         return TrainingBatch(
-            BatchMolGraph([self.featurizer(MolFromSmiles(s)) for s in self.smiles[start_idx:stop_idx]]),
+            self.featurizer(self.smiles[start_idx:stop_idx]),
             None,
             None,
             targets,

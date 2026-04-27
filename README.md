@@ -43,7 +43,7 @@ This repository is laid out like this:
 
 ## Installation
 
-With `python==3.13` one just needs to `pip install 'chemprop>=2.2.3' zarr polars pyarrow tensorboard` and the corresponding feature calculator:
+With `python==3.13` one just needs to `pip install 'chemprop>=2.2.3' zarr polars pyarrow tensorboard cuik-molmaker --extra-index-url https://pypi.nvidia.com/rdkit-latest/` (linux only, for now?) and the corresponding feature calculator:
 
  - `mordred-community`: `pip install mordredcommunity`.
  - OSMordred: follow the installation instructions from [this fork](https://github.com/JacksonBurns/osmordred/tree/65e7dd40cc8209d695d98838dff2f34673251249) of the original repository, installing into a __separate__ environment from your other dependencies

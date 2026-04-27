@@ -5,16 +5,14 @@ from pathlib import Path
 import polars
 import torch
 import zarr
-from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from chemprop.featurizers.atom import RIGRAtomFeaturizer, MultiHotAtomFeaturizer
-from chemprop.featurizers.bond import RIGRBondFeaturizer, MultiHotBondFeaturizer
+from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
 from chemprop.nn import BondMessagePassing, NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.utilities import rank_zero_info, rank_zero_only
+from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
 
@@ -89,9 +87,7 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    atom_featurizer = RIGRAtomFeaturizer() if FEATURIZER == "rigr" else MultiHotAtomFeaturizer.v2()
-    bond_featurizer = RIGRBondFeaturizer() if FEATURIZER == "rigr" else MultiHotBondFeaturizer()
-    featurizer = SimpleMoleculeMolGraphFeaturizer(atom_featurizer=atom_featurizer, bond_featurizer=bond_featurizer)
+    featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
 
     train_dataset = ChempropChunkwiseZarrDataset(
         train_smiles,

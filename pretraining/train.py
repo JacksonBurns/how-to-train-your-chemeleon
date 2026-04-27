@@ -7,7 +7,7 @@ import torch
 import zarr
 from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
-from chemprop.nn import BondMessagePassing, NormAggregation, RegressionFFN, metrics
+from chemprop.nn import NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint

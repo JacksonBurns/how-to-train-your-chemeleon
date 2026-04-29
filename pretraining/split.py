@@ -94,7 +94,7 @@ def compute_chunk_stats(args):
     return bcount, mean, m2
 
 
-def mean_std_zarr_parallel(zarr_path, max_workers=None, dtype=np.float64):
+def mean_std_zarr_parallel(zarr_path, max_workers=None, dtype=np.float16):
     """
     Computes mean and std in parallel using ProcessPoolExecutor.
     """
@@ -144,7 +144,7 @@ def mean_std_zarr_parallel(zarr_path, max_workers=None, dtype=np.float64):
     variance[valid_final] = final_m2[valid_final] / (final_count[valid_final] - 1)
     std = np.sqrt(variance)
 
-    return final_mean.astype(np.float32), std.astype(np.float32), final_count
+    return final_mean.astype(np.float16), std.astype(np.float16), final_count
 
 
 if __name__ == "__main__":
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         input_smiles_path = Path(sys.argv[2])
         outdir_path = Path(sys.argv[3])
     except:
-        print("Usage: python script.py <input_zarr_path> <input_smiles_path> <outdir_path>")
+        print("Usage: python split.py <input_zarr_path> <input_smiles_path> <outdir_path>")
         exit(1)
 
     if not input_path.exists():
@@ -201,11 +201,11 @@ if __name__ == "__main__":
         store=train_zarr,
         shape=(len(train_chunks) * rows_per_chunk, input_zarr.shape[1]),
         chunks=input_zarr.chunks,
-        dtype=np.float32,
+        dtype=np.float16,
         compressors=None,  # disable compression for faster access during training
         fill_value=np.nan,
     )
-    for i, chunk_idx in enumerate(train_chunks):
+    for i, chunk_idx in enumerate(tqdm(train_chunks, desc="Writing train array")):
         start_row = chunk_idx * rows_per_chunk
         end_row = start_row + rows_per_chunk
         z[i * rows_per_chunk : (i + 1) * rows_per_chunk, :] = input_zarr[start_row:end_row, :]
@@ -214,11 +214,11 @@ if __name__ == "__main__":
         store=val_zarr,
         shape=(len(val_chunks) * rows_per_chunk, input_zarr.shape[1]),
         chunks=input_zarr.chunks,
-        dtype=np.float32,
+        dtype=np.float16,
         compressors=None,  # disable compression for faster access during training
         fill_value=np.nan,
     )
-    for i, chunk_idx in enumerate(val_chunks):
+    for i, chunk_idx in enumerate(tqdm(val_chunks, desc="Writing train array")):
         start_row = chunk_idx * rows_per_chunk
         end_row = start_row + rows_per_chunk
         z[i * rows_per_chunk : (i + 1) * rows_per_chunk, :] = input_zarr[start_row:end_row, :]
@@ -243,7 +243,7 @@ if __name__ == "__main__":
         chunk_rows = z.chunks[0]
         for start in tqdm(range(0, n_rows, chunk_rows), desc=f"Rescaling {zarr_path.name}"):
             end = min(start + chunk_rows, n_rows)
-            chunk = z[start:end].astype(np.float32, copy=False)
+            chunk = z[start:end].astype(np.float16, copy=False)
             # Winsorize
             chunk = np.where(chunk < lower_limits, lower_limits, chunk)
             chunk = np.where(chunk > upper_limits, upper_limits, chunk)

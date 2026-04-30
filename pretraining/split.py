@@ -1,5 +1,5 @@
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 from pathlib import Path
 import sys
@@ -74,6 +74,46 @@ def compute_chunk_stats(args):
     return bcount, mean, m2
 
 
+# -----------------------------
+# Generic bounded executor
+# -----------------------------
+def run_bounded(tasks, worker_fn, max_workers, desc, reducer=None, initial=None):
+    """
+    Runs tasks with bounded in-flight futures.
+
+    If reducer is provided:
+        result = reducer(result, future.result())
+    """
+    max_in_flight = 2 * max_workers
+    task_iter = iter(tasks)
+
+    result = initial
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = deque()
+
+        # preload
+        for _ in range(min(max_in_flight, len(tasks))):
+            futures.append(executor.submit(worker_fn, next(task_iter)))
+
+        with tqdm(total=len(tasks), desc=desc) as pbar:
+            while futures:
+                future = futures.popleft()
+                out = future.result()
+
+                if reducer is not None:
+                    result = reducer(result, out)
+
+                pbar.update(1)
+
+                try:
+                    futures.append(executor.submit(worker_fn, next(task_iter)))
+                except StopIteration:
+                    pass
+
+    return result
+
+
 def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None):
     zarr_array = zarr.open(zarr_path, mode="r")
     n_cols = zarr_array.shape[1]
@@ -86,18 +126,20 @@ def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None):
 
     print(f"Calculating stats across {len(tasks)} training chunks with {max_workers} workers...")
 
-    total_stats = (
+    initial = (
         np.zeros(n_cols, dtype=np.int64),
         np.zeros(n_cols, dtype=np.float64),
         np.zeros(n_cols, dtype=np.float64),
     )
 
-    # STREAM results instead of storing all
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = (executor.submit(compute_chunk_stats, t) for t in tasks)
-
-        for future in tqdm(as_completed(list(futures)), total=len(tasks), desc="Computing stats"):
-            total_stats = combine_stats(total_stats, future.result())
+    total_stats = run_bounded(
+        tasks,
+        compute_chunk_stats,
+        max_workers,
+        desc="Computing stats",
+        reducer=combine_stats,
+        initial=initial,
+    )
 
     final_count, final_mean, final_m2 = total_stats
 
@@ -106,6 +148,7 @@ def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None):
     variance[valid] = final_m2[valid] / (final_count[valid] - 1)
 
     std = np.sqrt(variance)
+
     return final_mean, std, final_count
 
 
@@ -136,50 +179,19 @@ def process_and_write_chunk(args):
     out_start = out_chunk_idx * chunk_rows
     out_end = out_start + (in_end - in_start)
 
-    # Read + upcast
     chunk = z_in[in_start:in_end].astype(np.float64, copy=False)
 
-    # Winsorize in-place
     np.clip(chunk, lower_limits, upper_limits, out=chunk)
 
-    # Normalize in-place
     with np.errstate(divide="ignore", invalid="ignore"):
         chunk -= mean
         chunk /= std
 
-    # Handle bad std columns
     bad_std = (std == 0.0) | np.isnan(std)
     if np.any(bad_std):
         chunk[:, bad_std] = 0.0
 
-    # Write
     z_out[out_start:out_end] = chunk.astype(np.float16)
-
-
-# -----------------------------
-# Bounded executor helper
-# -----------------------------
-def run_bounded(tasks, worker_fn, max_workers, desc):
-    max_in_flight = 2 * max_workers
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = deque()
-        task_iter = iter(tasks)
-
-        # preload
-        for _ in range(min(max_in_flight, len(tasks))):
-            futures.append(executor.submit(worker_fn, next(task_iter)))
-
-        with tqdm(total=len(tasks), desc=desc) as pbar:
-            while futures:
-                future = futures.popleft()
-                future.result()
-                pbar.update(1)
-
-                try:
-                    futures.append(executor.submit(worker_fn, next(task_iter)))
-                except StopIteration:
-                    pass
 
 
 # -----------------------------
@@ -208,7 +220,7 @@ if __name__ == "__main__":
     else:
         outdir_path.mkdir(parents=True)
 
-    # IMPORTANT: don't oversubscribe memory
+    # Conservative to avoid memory pressure
     max_workers = min(4, os.cpu_count())
 
     input_zarr = zarr.open(input_path, mode="r")
@@ -294,7 +306,7 @@ if __name__ == "__main__":
     )
 
     # -----------------------------
-    # Processing tasks
+    # Processing
     # -----------------------------
     processing_tasks = []
 
@@ -316,7 +328,7 @@ if __name__ == "__main__":
         processing_tasks,
         process_and_write_chunk,
         max_workers,
-        desc="Writing scaled chunks"
+        desc="Writing scaled chunks",
     )
 
     print("\nDone.")

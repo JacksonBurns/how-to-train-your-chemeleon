@@ -1,5 +1,5 @@
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import sys
 
@@ -14,35 +14,26 @@ from config import WINSORIZATION_FACTOR
 def combine_stats(stat_a, stat_b):
     """
     Merges two sets of Welford statistics (n, mean, M2) into one.
-    This allows parallel computation of variance.
     """
     na, mean_a, m2_a = stat_a
     nb, mean_b, m2_b = stat_b
 
     n_combined = na + nb
-
-    # Calculate delta
     delta = mean_b - mean_a
 
-    # Combined mean
     with np.errstate(divide="ignore", invalid="ignore"):
         mean_combined = mean_a + delta * (nb / n_combined)
-
-        # Combined M2 (Sum of squares of differences from the mean)
         m2_combined = m2_a + m2_b + (delta**2) * (na * nb / n_combined)
 
-    # Where only one side had data, we preserve that side's stats
     mask_a_only = (na > 0) & (nb == 0)
     mask_b_only = (nb > 0) & (na == 0)
 
-    # Restore values where the other side was empty (fix NaNs from 0/0)
     mean_combined[mask_a_only] = mean_a[mask_a_only]
     m2_combined[mask_a_only] = m2_a[mask_a_only]
 
     mean_combined[mask_b_only] = mean_b[mask_b_only]
     m2_combined[mask_b_only] = m2_b[mask_b_only]
 
-    # Fill remaining NaNs (where both were 0) with 0.0
     mean_combined = np.nan_to_num(mean_combined, nan=0.0)
     m2_combined = np.nan_to_num(m2_combined, nan=0.0)
 
@@ -51,68 +42,58 @@ def combine_stats(stat_a, stat_b):
 
 def compute_chunk_stats(args):
     """
-    Worker function to compute stats for a single chunk in float64.
+    Worker function to compute stats directly from the source Zarr.
     """
-    zarr_path, start, end = args
+    zarr_path, chunk_idx, chunk_rows = args
 
     z_array = zarr.open(zarr_path, mode="r")
+    n_rows, n_cols = z_array.shape
 
-    # Read chunk and explicitly upcast to float64 to prevent overflow
+    start = chunk_idx * chunk_rows
+    end = min(start + chunk_rows, n_rows)
+
+    # Read chunk and upcast to float64
     chunk = z_array[start:end].astype(np.float64, copy=False)
 
-    # Mask finite values
     finite = np.isfinite(chunk)
     bcount = finite.sum(axis=0)
 
-    n_cols = z_array.shape[1]
-    
-    # If chunk has no valid data at all
     if not np.any(bcount):
         return (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=np.float64), np.zeros(n_cols, dtype=np.float64))
 
-    # Compute local mean
     chunk_sum = np.where(finite, chunk, 0.0).sum(axis=0)
-
     mean = np.zeros_like(chunk_sum, dtype=np.float64)
     valid = bcount > 0
     mean[valid] = chunk_sum[valid] / bcount[valid]
 
-    # Compute local M2
     diff = np.where(finite, chunk - mean, 0.0)
     m2 = (diff * diff).sum(axis=0)
 
     return bcount, mean, m2
 
 
-def mean_std_zarr_parallel(zarr_path, max_workers=None):
+def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None):
     """
-    Computes mean and std in parallel using ProcessPoolExecutor.
-    Maintains float64 precision throughout calculation.
+    Computes mean and std using ONLY the training indices from the source array.
     """
     zarr_array = zarr.open(zarr_path, mode="r")
-    n_rows, n_cols = zarr_array.shape
+    n_cols = zarr_array.shape[1]
     chunk_rows = zarr_array.chunks[0]
 
     if max_workers is None:
         max_workers = max(1, os.cpu_count() - 1)
 
-    # Prepare tasks
-    tasks = []
-    for i in range(0, n_rows, chunk_rows):
-        end = min(i + chunk_rows, n_rows)
-        tasks.append((zarr_path, i, end))
+    # Prepare tasks ONLY for training chunks
+    tasks = [(zarr_path, idx, chunk_rows) for idx in train_chunks]
 
-    print(f"Processing {len(tasks)} chunks with {max_workers} workers...")
+    print(f"Calculating stats across {len(tasks)} training chunks with {max_workers} workers...")
 
     results = []
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(compute_chunk_stats, t) for t in tasks]
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Computing chunks"):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Computing stats"):
             results.append(future.result())
 
-    print("Merging statistics...")
-
-    # Initialize float64 accumulator
     total_stats = (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=np.float64), np.zeros(n_cols, dtype=np.float64))
 
     for part_stats in results:
@@ -120,7 +101,6 @@ def mean_std_zarr_parallel(zarr_path, max_workers=None):
 
     final_count, final_mean, final_m2 = total_stats
 
-    # Calculate final Std Dev
     variance = np.full(n_cols, np.nan, dtype=np.float64)
     valid_final = final_count > 1
 
@@ -130,46 +110,41 @@ def mean_std_zarr_parallel(zarr_path, max_workers=None):
     return final_mean, std, final_count
 
 
-def copy_chunk(args):
-    """ Worker function to copy a chunk from input to output Zarr in parallel. """
-    in_path, out_path, in_start, out_start, rows_per_chunk = args
+def process_and_write_chunk(args):
+    """ 
+    Worker function to read from source, winsorize, rescale, and write to output 
+    in a single pass.
+    """
+    in_path, out_path, in_chunk_idx, out_chunk_idx, chunk_rows, lower_limits, upper_limits, mean, std = args
     z_in = zarr.open(in_path, mode="r")
     z_out = zarr.open(out_path, mode="r+")
     
-    in_end = in_start + rows_per_chunk
-    out_end = out_start + rows_per_chunk
+    n_rows = z_in.shape[0]
+    in_start = in_chunk_idx * chunk_rows
+    in_end = min(in_start + chunk_rows, n_rows)
     
-    z_out[out_start:out_end, :] = z_in[in_start:in_end, :]
-
-
-def rescale_chunk(args):
-    """ Worker function to winsorize and rescale chunks in parallel. """
-    zarr_path, start, end, lower_limits, upper_limits, mean, std = args
-    z = zarr.open(zarr_path, mode="r+")
+    out_start = out_chunk_idx * chunk_rows
+    out_end = out_start + (in_end - in_start)
     
-    # Read as float64 to prevent overflow
-    chunk = z[start:end].astype(np.float64, copy=False)
-    finite_mask = np.isfinite(chunk)
+    # 1. Read as float64
+    chunk = z_in[in_start:in_end].astype(np.float64, copy=False)
 
-    # Winsorize: Apply clipping only to finite values
-    chunk = np.where((chunk < lower_limits) & finite_mask, lower_limits, chunk)
-    chunk = np.where((chunk > upper_limits) & finite_mask, upper_limits, chunk)
+    # 2. Winsorize efficiently in-place
+    # np.clip handles the upper and lower bounds simultaneously and writes back to 'chunk'
+    np.clip(chunk, lower_limits, upper_limits, out=chunk)
 
-    # Rescale
+    # 3. Rescale in-place
+    # Subtract mean and divide by std directly inside the existing memory block
     with np.errstate(divide="ignore", invalid="ignore"):
-        rescaled = (chunk - mean) / std
+        chunk -= mean
+        chunk /= std
 
-    # Restore NaNs where original data was completely absent
-    rescaled = np.where(finite_mask, rescaled, np.nan)
-
-    # Handle zero-variance or completely absent columns
-    # If std is 0.0 or NaN, standardize finite entries in those columns to 0.0 
     bad_std = (std == 0.0) | np.isnan(std)
     if np.any(bad_std):
-        rescaled[:, bad_std] = np.where(finite_mask[:, bad_std], 0.0, np.nan)
+        chunk[:, bad_std] = np.where(finite_mask[:, bad_std], 0.0, np.nan)
 
-    # Write back as float16
-    z[start:end] = rescaled.astype(np.float16)
+    # 4. Write back as float16 directly to the final destination
+    z_out[out_start:out_end] = chunk.astype(np.float16)
 
 
 if __name__ == "__main__":
@@ -190,15 +165,11 @@ if __name__ == "__main__":
         exit(1)
 
     if outdir_path.exists():
-        print(f"Warning: {outdir_path} already exists. Overwrite contents? (y/n)")
-        response = input().strip().lower()
-        if response != "y":
-            print("Operation cancelled.")
-            exit(1)
+        print(f"Warning: {outdir_path} already exists.")
+        exit(1)
     else:
         outdir_path.mkdir(parents=True)
 
-    # Set up globals for processes
     max_workers = max(1, os.cpu_count() - 1)
 
     input_zarr = zarr.open(input_path, mode="r")
@@ -220,7 +191,18 @@ if __name__ == "__main__":
     polars.DataFrame({"SMILES": [s for chunk in train_smiles for s in chunk]}).write_parquet(outdir_path / "train_smiles.parquet")
     polars.DataFrame({"SMILES": [s for chunk in val_smiles for s in chunk]}).write_parquet(outdir_path / "val_smiles.parquet")
 
-    print("Creating Train and Validation Zarr structures...")
+    # 1. Calculate Mean and Std straight from the source Zarr using ONLY Train Indices
+    mean, std, count = mean_std_zarr_parallel(str(input_path), train_chunks, max_workers=max_workers)
+
+    np.save(outdir_path / f"feature_train_means_{input_path.stem}.npy", mean)
+    np.save(outdir_path / f"feature_train_stds_{input_path.stem}.npy", std)
+    np.save(outdir_path / f"feature_train_counts_{input_path.stem}.npy", count)
+
+    lower_limits = mean - WINSORIZATION_FACTOR * std
+    upper_limits = mean + WINSORIZATION_FACTOR * std
+
+    # 2. Create the empty destination structures
+    print("Creating destination Train and Val Zarr arrays...")
     train_zarr_path = str(outdir_path / "train_rescaled.zarr")
     val_zarr_path = str(outdir_path / "val_rescaled.zarr")
 
@@ -241,49 +223,20 @@ if __name__ == "__main__":
         fill_value=np.nan,
     )
 
-    # Prepare copy tasks
-    copy_tasks = []
+    # 3. Build single-pass processing tasks
+    processing_tasks = []
+    
     for out_idx, in_idx in enumerate(train_chunks):
-        in_start = in_idx * rows_per_chunk
-        out_start = out_idx * rows_per_chunk
-        copy_tasks.append((str(input_path), train_zarr_path, in_start, out_start, rows_per_chunk))
+        processing_tasks.append((str(input_path), train_zarr_path, in_idx, out_idx, rows_per_chunk, lower_limits, upper_limits, mean, std))
         
     for out_idx, in_idx in enumerate(val_chunks):
-        in_start = in_idx * rows_per_chunk
-        out_start = out_idx * rows_per_chunk
-        copy_tasks.append((str(input_path), val_zarr_path, in_start, out_start, rows_per_chunk))
+        processing_tasks.append((str(input_path), val_zarr_path, in_idx, out_idx, rows_per_chunk, lower_limits, upper_limits, mean, std))
 
-    print(f"Copying data into distinct Train and Val sets using {max_workers} processes...")
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(copy_chunk, t) for t in copy_tasks]
-        for _ in tqdm(as_completed(futures), total=len(futures), desc="Copying chunks"):
-            pass
-
-    print("\nCalculating mean and std for training set (Float64 Precision)...")
-    mean, std, count = mean_std_zarr_parallel(train_zarr_path, max_workers=max_workers)
-
-    # Save metadata (will be float64 type)
-    np.save(outdir_path / f"feature_train_means_{input_path.stem}.npy", mean)
-    np.save(outdir_path / f"feature_train_stds_{input_path.stem}.npy", std)
-    np.save(outdir_path / f"feature_train_counts_{input_path.stem}.npy", count)
-
-    lower_limits = mean - WINSORIZATION_FACTOR * std
-    upper_limits = mean + WINSORIZATION_FACTOR * std
-
-    # Prepare parallel rescale tasks
-    rescale_tasks = []
-    for zarr_path in [train_zarr_path, val_zarr_path]:
-        z = zarr.open(zarr_path, mode="r")
-        n_rows = z.shape[0]
-        chunk_rows = z.chunks[0]
-        for start in range(0, n_rows, chunk_rows):
-            end = min(start + chunk_rows, n_rows)
-            rescale_tasks.append((zarr_path, start, end, lower_limits, upper_limits, mean, std))
-
-    print("\nApplying winsorization and rescaling to train and validation sets in parallel...")
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(rescale_chunk, t) for t in rescale_tasks]
-        for _ in tqdm(as_completed(futures), total=len(futures), desc="Rescaling chunks"):
+    # 4. Execute Read -> Scale -> Write in one sweep
+    print(f"\nProcessing and writing scaled data in a single pass using {max_workers} processes...")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_and_write_chunk, t) for t in processing_tasks]
+        for _ in tqdm(as_completed(futures), total=len(futures), desc="Writing scaled chunks"):
             pass
 
     print("\nData splitting and scaling completed successfully.")

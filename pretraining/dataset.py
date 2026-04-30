@@ -12,11 +12,14 @@ from config import CHUNKS_PER_BATCH
 class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
     def __init__(self, smiles: list[str], zarr_store: str, featurizer: CuikmolmakerMolGraphFeaturizer):
         self.smiles = np.array(smiles)
-        self.z = zarr.open_array(zarr_store)
-        assert self.z.shape[0] == len(smiles), "Mismatched smiles and feature sizes"
+        self.zarr_store = zarr_store
+        _z = zarr.open_array(zarr_store)
+        assert _z.shape[0] == len(smiles), "Mismatched smiles and feature sizes"
 
         self.n_rows = len(smiles)
-        self.chunksize = self.z.chunks[0]
+        self.chunksize = _z.chunks[0]
+        
+        del _z
 
         # Calculate the effective size of a batch (multiple chunks)
         self.items_per_batch = self.chunksize * CHUNKS_PER_BATCH
@@ -29,6 +32,9 @@ class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
         return self.len
 
     def __getitem__(self, idx: int):
+        if z is None:
+            self.z = zarr.open_array(zarr_store)
+
         # Calculate start and stop indices based on the combined batch size
         start_idx = idx * self.items_per_batch
         stop_idx = min(start_idx + self.items_per_batch, self.n_rows)

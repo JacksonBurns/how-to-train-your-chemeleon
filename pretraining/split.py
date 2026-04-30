@@ -36,28 +36,34 @@ def compute_chunk_stats(args):
     """
     Worker function to compute stats for a single chunk.
     Args:
-        args: tuple of (zarr_path, start_row, end_row, dtype)
+        args: tuple of (zarr_path, start_row, end_row)
     """
-    zarr_path, start, end, dtype = args
+    zarr_path, start, end = args
     z_array = zarr.open(zarr_path, mode="r")
-    chunk = z_array[start:end].astype(dtype, copy=False)
+    
+    # Upcast to float64 to maintain precision during statistical calculations
+    chunk = z_array[start:end].astype(np.float64, copy=False)
     finite = np.isfinite(chunk)
     bcount = finite.sum(axis=0)
+    
     if not np.any(bcount):
         n_cols = z_array.shape[1]
-        return (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=dtype), np.zeros(n_cols, dtype=dtype))
+        return (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=np.float64), np.zeros(n_cols, dtype=np.float64))
+        
     chunk_sum = np.where(finite, chunk, 0.0).sum(axis=0)
     mean = np.zeros_like(chunk_sum)
     valid = bcount > 0
     mean[valid] = chunk_sum[valid] / bcount[valid]
     diff = np.where(finite, chunk - mean, 0.0)
     m2 = (diff * diff).sum(axis=0)
+    
     return bcount, mean, m2
 
 
-def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None, dtype=np.float16):
+def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None):
     """
     Computes mean and std in parallel using ProcessPoolExecutor.
+    Computations are explicitly performed in float64.
     """
     zarr_array = zarr.open(zarr_path, mode="r")
     n_rows, n_cols = zarr_array.shape
@@ -72,7 +78,7 @@ def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None, dtype=np.f
         if i // chunk_rows in train_chunks:
             end = min(i + chunk_rows, n_rows)
             # We pass the path, not the object, to avoid pickling large Zarr objects
-            tasks.append((zarr_path, i, end, dtype))
+            tasks.append((zarr_path, i, end))
 
     print(f"Processing {len(tasks)} chunks with {max_workers} workers...")
 
@@ -88,8 +94,8 @@ def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None, dtype=np.f
     print("Merging statistics...")
 
     # Reduce step: Combine all partial stats
-    # Initialize accumulator with zeros
-    total_stats = (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=dtype), np.zeros(n_cols, dtype=dtype))
+    # Initialize accumulator with zeros using float64
+    total_stats = (np.zeros(n_cols, dtype=np.int64), np.zeros(n_cols, dtype=np.float64), np.zeros(n_cols, dtype=np.float64))
 
     # Iteratively merge
     for part_stats in results:
@@ -98,14 +104,15 @@ def mean_std_zarr_parallel(zarr_path, train_chunks, max_workers=None, dtype=np.f
     final_count, final_mean, final_m2 = total_stats
 
     # Calculate final Std Dev
-    variance = np.full(n_cols, np.nan, dtype=dtype)
+    variance = np.full(n_cols, np.nan, dtype=np.float64)
     valid_final = final_count > 1
 
     # Variance = M2 / (n - 1) for sample variance
     variance[valid_final] = final_m2[valid_final] / (final_count[valid_final] - 1)
     std = np.sqrt(variance)
 
-    return final_mean.astype(np.float16), std.astype(np.float16), final_count
+    # Returning as float64 natively
+    return final_mean, std, final_count
 
 
 if __name__ == "__main__":
@@ -159,7 +166,7 @@ if __name__ == "__main__":
     print("Calculating mean and std for training set...")
     mean, std, count = mean_std_zarr_parallel(input_path, train_chunks)
 
-    # save metadata
+    # save metadata (will naturally save as float64 now)
     np.save(outdir_path / f"feature_train_means_{input_path.stem}.npy", mean)
     np.save(outdir_path / f"feature_train_stds_{input_path.stem}.npy", std)
     np.save(outdir_path / f"feature_train_counts_{input_path.stem}.npy", count)
@@ -192,10 +199,16 @@ if __name__ == "__main__":
         chunk_rows = z.chunks[0]
         for start in tqdm(range(0, n_rows, chunk_rows), desc=f"Rescaling {zarr_path.name}"):
             end = min(start + chunk_rows, n_rows)
-            chunk = input_zarr[start:end].astype(np.float16, copy=False)
+            
+            # Upcast block to float64 to prevent bounds errors / type mismatch during operations with float64 means/stds
+            chunk = input_zarr[start:end].astype(np.float64, copy=False)
+            
             # Winsorize
-            chunk.clip(lower=lower_limits, upper=upper_limits, out=chunk)
+            chunk.clip(min=lower_limits, max=upper_limits, out=chunk)
+            
             # Rescale
             chunk -= mean
             chunk /= std
-            z[start:end] = chunk
+            
+            # Cast down to float16 purely for saving to the Zarr store
+            z[start:end] = chunk.astype(np.float16, copy=False)

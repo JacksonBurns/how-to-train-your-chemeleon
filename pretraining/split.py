@@ -157,7 +157,7 @@ if __name__ == "__main__":
     polars.DataFrame({"SMILES": [s for chunk in val_smiles for s in chunk]}).write_parquet(outdir_path / "val_smiles.parquet")
 
     print("Calculating mean and std for training set...")
-    mean, std, count = mean_std_zarr_parallel(input_zarr, train_chunks)
+    mean, std, count = mean_std_zarr_parallel(input_path, train_chunks)
 
     # save metadata
     np.save(outdir_path / f"feature_train_means_{input_path.stem}.npy", mean)

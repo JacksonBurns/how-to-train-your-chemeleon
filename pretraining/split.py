@@ -221,7 +221,7 @@ if __name__ == "__main__":
         outdir_path.mkdir(parents=True)
 
     # Conservative to avoid memory pressure
-    max_workers = min(4, os.cpu_count())
+    max_workers = min(8, os.cpu_count() - 1)
 
     input_zarr = zarr.open(input_path, mode="r")
     input_n_chunks = input_zarr.nchunks

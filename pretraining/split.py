@@ -195,20 +195,40 @@ if __name__ == "__main__":
             compressors=None,
             fill_value=np.nan,
         )
-        n_rows = z.shape[0]
-        chunk_rows = z.chunks[0]
-        for start in tqdm(range(0, n_rows, chunk_rows), desc=f"Rescaling {zarr_path.name}"):
-            end = min(start + chunk_rows, n_rows)
+        
+        # We process in batches of `shard_multiplier` to write full shards at once
+        for shard_start_idx in tqdm(range(0, len(zarr_chunks), shard_multiplier), desc=f"Rescaling {zarr_path.name}"):
+            # Get the random chunk indices belonging to this specific shard
+            current_shard_chunk_indices = zarr_chunks[shard_start_idx : shard_start_idx + shard_multiplier]
             
-            # Upcast block to float64 to prevent bounds errors / type mismatch during operations with float64 means/stds
-            chunk = input_zarr[start:end].astype(np.float64, copy=False)
+            shard_data = []
             
-            # Winsorize
-            chunk.clip(min=lower_limits, max=upper_limits, out=chunk)
+            # Read and process each chunk for this shard
+            for chunk_idx in current_shard_chunk_indices:
+                # Calculate the actual read coordinates based on the randomized chunk_idx
+                read_start = chunk_idx * rows_per_chunk
+                read_end = read_start + rows_per_chunk
+                
+                # Upcast and read from the randomized location
+                chunk = input_zarr[read_start:read_end].astype(np.float64, copy=False)
+                
+                # Winsorize
+                chunk.clip(min=lower_limits, max=upper_limits, out=chunk)
+                
+                # Rescale
+                chunk -= mean
+                chunk /= std
+                
+                # Cast down and append to our shard buffer
+                shard_data.append(chunk.astype(np.float16, copy=False))
             
-            # Rescale
-            chunk -= mean
-            chunk /= std
-            
-            # Cast down to float16 purely for saving to the Zarr store
-            z[start:end] = chunk.astype(np.float16, copy=False)
+            # Concatenate the processed chunks into one full shard
+            if shard_data:
+                full_shard_array = np.concatenate(shard_data, axis=0)
+                
+                # Calculate where this shard belongs in the NEW sequential zarr array
+                write_start = shard_start_idx * rows_per_chunk
+                write_end = write_start + full_shard_array.shape[0]
+                
+                # Write the entire shard in one IO operation
+                z[write_start:write_end] = full_shard_array

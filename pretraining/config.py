@@ -2,13 +2,13 @@
 WINSORIZATION_FACTOR = 3
 
 # for training
-DROPOUT_FRACTION = 0.30
-EPOCHS = 100
-PATIENCE = 5
+DROPOUT_FRACTION = 0.40  # see: https://doi.org/10.1039/D5DD00369E -> 60% mask = 40% dropout, keeps most while being statistically the best (tied)
+EPOCHS = 5
+PATIENCE = 1
 INITIAL_LEARNING_RATE = 0.0001
 MAXIMUM_LEARNING_RATE = 0.001
 FINAL_LEARNING_RATE = 0.0001
-WARMUP_EPOCHS = 5
+WARMUP_EPOCHS = 1
 CHUNKS_PER_BATCH = 2
 
 # model hyperparameters

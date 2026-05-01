@@ -1,5 +1,4 @@
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import polars
@@ -30,13 +29,13 @@ from config import (
     MP_HIDDEN_SIZE,
     PATIENCE,
     WARMUP_EPOCHS,
+    CHUNKS_PER_BATCH,
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
 from multiweight_message_passing import MultiweightMessagePassing
-
-
-NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+from sampler import ShardAwareSampler
+from now import NOW
 
 
 if __name__ == "__main__":
@@ -83,6 +82,13 @@ if __name__ == "__main__":
 
     z = zarr.open_array(training_store, mode="r")
     n_features = z.shape[1]
+    
+    rows_per_chunk = z.chunks[0]
+    bytes_per_row = n_features * 2
+    target_rows_for_1gb = (1024**3) // bytes_per_row
+    shard_multiplier = max(1, round(target_rows_for_1gb / rows_per_chunk))
+    batches_per_shard = max(1, shard_multiplier // CHUNKS_PER_BATCH)
+    
     del z
 
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
@@ -100,9 +106,12 @@ if __name__ == "__main__":
         validation_store,
         featurizer,
     )
+    
+    train_sampler = ShardAwareSampler(train_dataset, batches_per_shard, shuffle=True)
+    val_sampler = ShardAwareSampler(val_dataset, batches_per_shard, shuffle=False)
 
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, shuffle=True, num_workers=4, persistent_workers=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, shuffle=False, num_workers=4, persistent_workers=True)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, sampler=train_sampler, num_workers=4, persistent_workers=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, sampler=val_sampler, num_workers=4, persistent_workers=True)
 
     model = MPNN(
         MultiweightMessagePassing(
@@ -151,6 +160,7 @@ if __name__ == "__main__":
         enable_checkpointing=True,
         check_val_every_n_epoch=1,
         callbacks=callbacks,
+        use_distributed_sampler=False,
     )
     trainer.fit(model, train_dataloader, val_dataloader)
     ckpt_path = trainer.checkpoint_callback.best_model_path
@@ -158,3 +168,4 @@ if __name__ == "__main__":
     model = model.__class__.load_from_checkpoint(ckpt_path, map_location="cpu")
     trainer.validate(model, val_dataloader)
     torch.save(model, output_dir / "best.pt")
+    torch.save(model.message_passing, output_dir / "chemeleon2_preview_mp.pt")

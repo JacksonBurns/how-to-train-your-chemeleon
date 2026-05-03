@@ -9,7 +9,7 @@ from get_chunksize import get_chunk_rows
 
 logger = logging.getLogger(__name__)
 
-DTYPE = np.float32
+DTYPE = np.float16
 DESCRIPTOR_COUNT = 3585
 DESCRIPTOR_NAMES = (
     "ABCIndex_1",

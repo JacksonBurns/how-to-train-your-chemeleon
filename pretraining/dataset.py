@@ -1,28 +1,25 @@
 import math
-
 import numpy as np
 import torch
 import zarr
-from chemprop.data.collate import BatchMolGraph, TrainingBatch
-from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from rdkit.Chem import MolFromSmiles
+from chemprop.data.collate import TrainingBatch
 
 from config import CHUNKS_PER_BATCH
 
-
 class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
-    def __init__(self, smiles: list[str], zarr_store: str, featurizer: SimpleMoleculeMolGraphFeaturizer):
+    def __init__(self, smiles: list[str], zarr_store: str, featurizer: "PatchedCuikmolmakerMolGraphFeaturizer"):
         self.smiles = np.array(smiles)
-        self.z = zarr.open_array(zarr_store)
-        assert self.z.shape[0] == len(smiles), "Mismatched smiles and feature sizes"
+        self.zarr_store = zarr_store
+        self.z = None  # Lazily loaded to prevent multiprocessing hangs
+        
+        # Open temporarily just to get metadata
+        _temp_z = zarr.open_array(zarr_store)
+        assert _temp_z.shape[0] == len(smiles), "Mismatched smiles and feature sizes"
 
         self.n_rows = len(smiles)
-        self.chunksize = self.z.chunks[0]
+        self.chunksize = _temp_z.chunks[0]
 
-        # Calculate the effective size of a batch (multiple chunks)
         self.items_per_batch = self.chunksize * CHUNKS_PER_BATCH
-
-        # Update length to reflect the new number of multi-chunk groups
         self.len = math.ceil(self.n_rows / self.items_per_batch)
         self.featurizer = featurizer
 
@@ -30,16 +27,20 @@ class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
         return self.len
 
     def __getitem__(self, idx: int):
-        # Calculate start and stop indices based on the combined batch size
+        if self.z is None:
+            self.z = zarr.open_array(self.zarr_store)
+
         start_idx = idx * self.items_per_batch
         stop_idx = min(start_idx + self.items_per_batch, self.n_rows)
 
-        # Zarr handles cross-chunk slicing automatically
+        features = self.featurizer(self.smiles[start_idx:stop_idx].tolist())
+        
+        # Directly slice targets. The dimensions are now guaranteed to match!
         targets = torch.tensor(self.z[start_idx:stop_idx, :], dtype=torch.float32)
-        weights = torch.ones((stop_idx - start_idx, 1), dtype=torch.float32)
+        weights = torch.ones((targets.shape[0], 1), dtype=torch.float32)
 
         return TrainingBatch(
-            BatchMolGraph([self.featurizer(MolFromSmiles(s)) for s in self.smiles[start_idx:stop_idx]]),
+            features,
             None,
             None,
             targets,

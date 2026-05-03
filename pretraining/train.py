@@ -1,22 +1,21 @@
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import polars
 import torch
 import zarr
-from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from chemprop.featurizers.atom import RIGRAtomFeaturizer, MultiHotAtomFeaturizer
-from chemprop.featurizers.bond import RIGRBondFeaturizer, MultiHotBondFeaturizer
+import numpy as np
+from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer, BatchCuikMolGraph
 from chemprop.models import MPNN
-from chemprop.nn import BondMessagePassing, NormAggregation, RegressionFFN, metrics
+from chemprop.nn import NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
 from lightning.pytorch.loggers import TensorBoardLogger
-from lightning.pytorch.utilities import rank_zero_info, rank_zero_only
+from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
+import cuik_molmaker
 
 from config import (
     EPOCHS,
@@ -32,12 +31,80 @@ from config import (
     MP_HIDDEN_SIZE,
     PATIENCE,
     WARMUP_EPOCHS,
+    CHUNKS_PER_BATCH,
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
+from multiweight_message_passing import MultiweightMessagePassing
+from now import NOW
 
+class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
+    def __call__(
+        self,
+        smiles_list: list[str],
+        atom_features_extra: np.ndarray | None = None,
+        bond_features_extra: np.ndarray | None = None,
+    ) -> BatchCuikMolGraph:
+        offset_carbon, duplicate_edges, add_self_loop = False, True, False
 
-NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        (
+            atom_feats,
+            bond_feats,
+            edge_index,
+            rev_edge_index,
+            batch,
+        ) = cuik_molmaker.batch_mol_featurizer(
+            smiles_list,
+            self.atom_property_list_onehot,
+            self.atom_property_list_float,
+            self.bond_property_list,
+            self.add_h,
+            offset_carbon,
+            duplicate_edges,
+            add_self_loop,
+        )
+
+        # ------------------------------------------------------------------
+        # LOCAL PATCH: Inject dummy nodes for explicitly empty SMILES
+        # Ensures the batch size matches the input length exactly.
+        # ------------------------------------------------------------------
+        empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
+        if empty_indices:
+            empty_indices_arr = np.array(empty_indices, dtype=np.int64)
+
+            if edge_index.size > 0:
+                shifts = np.searchsorted(empty_indices_arr, batch[edge_index], side="right")
+                edge_index += shifts
+
+            insert_positions = np.searchsorted(batch, empty_indices_arr)
+
+            dummy_atoms = np.zeros((len(empty_indices_arr), atom_feats.shape[1]), dtype=atom_feats.dtype)
+            atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
+
+            batch = np.insert(batch, insert_positions, empty_indices_arr)
+        # ------------------------------------------------------------------
+
+        atom_feats = torch.from_numpy(atom_feats)
+        bond_feats = torch.from_numpy(bond_feats)
+        edge_index = torch.from_numpy(edge_index)
+        rev_edge_index = torch.from_numpy(rev_edge_index)
+        batch = torch.from_numpy(batch)
+
+        if atom_features_extra is not None:
+            atom_features_extra = torch.tensor(atom_features_extra, dtype=torch.float32)
+            atom_feats = torch.cat((atom_feats, atom_features_extra), dim=1)
+        if bond_features_extra is not None:
+            bond_features_extra = np.repeat(bond_features_extra, repeats=2, axis=0)
+            bond_features_extra = torch.tensor(bond_features_extra, dtype=torch.float32)
+            bond_feats = torch.cat((bond_feats, bond_features_extra), dim=1)
+
+        return BatchCuikMolGraph(
+            V=atom_feats,
+            E=bond_feats,
+            edge_index=edge_index,
+            rev_edge_index=rev_edge_index,
+            batch=batch,
+        )
 
 
 if __name__ == "__main__":
@@ -84,14 +151,19 @@ if __name__ == "__main__":
 
     z = zarr.open_array(training_store, mode="r")
     n_features = z.shape[1]
+    
+    rows_per_chunk = z.chunks[0]
+    bytes_per_row = n_features * 2
+    target_rows_for_1gb = (1024**3) // bytes_per_row
+    shard_multiplier = max(1, round(target_rows_for_1gb / rows_per_chunk))
+    batches_per_shard = max(1, shard_multiplier // CHUNKS_PER_BATCH)
+    
     del z
 
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    atom_featurizer = RIGRAtomFeaturizer() if FEATURIZER == "rigr" else MultiHotAtomFeaturizer.v2()
-    bond_featurizer = RIGRBondFeaturizer() if FEATURIZER == "rigr" else MultiHotBondFeaturizer()
-    featurizer = SimpleMoleculeMolGraphFeaturizer(atom_featurizer=atom_featurizer, bond_featurizer=bond_featurizer)
+    featurizer = PatchedCuikmolmakerMolGraphFeaturizer(FEATURIZER)
 
     train_dataset = ChempropChunkwiseZarrDataset(
         train_smiles,
@@ -104,11 +176,11 @@ if __name__ == "__main__":
         featurizer,
     )
 
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, shuffle=True, num_workers=4, persistent_workers=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, shuffle=False, num_workers=4, persistent_workers=True)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, shuffle=True, num_workers=2, persistent_workers=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True)
 
     model = MPNN(
-        BondMessagePassing(
+        MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
             d_h=MP_HIDDEN_SIZE,
@@ -154,6 +226,8 @@ if __name__ == "__main__":
         enable_checkpointing=True,
         check_val_every_n_epoch=1,
         callbacks=callbacks,
+        use_distributed_sampler=False,
+        val_check_interval=0.5,
     )
     trainer.fit(model, train_dataloader, val_dataloader)
     ckpt_path = trainer.checkpoint_callback.best_model_path
@@ -161,3 +235,4 @@ if __name__ == "__main__":
     model = model.__class__.load_from_checkpoint(ckpt_path, map_location="cpu")
     trainer.validate(model, val_dataloader)
     torch.save(model, output_dir / "best.pt")
+    torch.save(model.message_passing, output_dir / "chemeleon2_preview_mp.pt")

@@ -1,3 +1,8 @@
+# preview-related files
+molpile_smiles.parquet
+molpile_150M_subset.parquet
+pretraining/chemeleon2_preview
+
 # my own checking
 demo
 

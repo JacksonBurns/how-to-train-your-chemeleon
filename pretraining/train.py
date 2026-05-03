@@ -4,7 +4,8 @@ from pathlib import Path
 import polars
 import torch
 import zarr
-from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
+import numpy as np
+from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer, BatchCuikMolGraph
 from chemprop.models import MPNN
 from chemprop.nn import NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
@@ -14,6 +15,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
+import cuik_molmaker
 
 from config import (
     EPOCHS,
@@ -34,8 +36,75 @@ from config import (
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
 from multiweight_message_passing import MultiweightMessagePassing
-from sampler import ShardAwareSampler
 from now import NOW
+
+class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
+    def __call__(
+        self,
+        smiles_list: list[str],
+        atom_features_extra: np.ndarray | None = None,
+        bond_features_extra: np.ndarray | None = None,
+    ) -> BatchCuikMolGraph:
+        offset_carbon, duplicate_edges, add_self_loop = False, True, False
+
+        (
+            atom_feats,
+            bond_feats,
+            edge_index,
+            rev_edge_index,
+            batch,
+        ) = cuik_molmaker.batch_mol_featurizer(
+            smiles_list,
+            self.atom_property_list_onehot,
+            self.atom_property_list_float,
+            self.bond_property_list,
+            self.add_h,
+            offset_carbon,
+            duplicate_edges,
+            add_self_loop,
+        )
+
+        # ------------------------------------------------------------------
+        # LOCAL PATCH: Inject dummy nodes for explicitly empty SMILES
+        # Ensures the batch size matches the input length exactly.
+        # ------------------------------------------------------------------
+        empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
+        if empty_indices:
+            empty_indices_arr = np.array(empty_indices, dtype=np.int64)
+
+            if edge_index.size > 0:
+                shifts = np.searchsorted(empty_indices_arr, batch[edge_index], side="right")
+                edge_index += shifts
+
+            insert_positions = np.searchsorted(batch, empty_indices_arr)
+
+            dummy_atoms = np.zeros((len(empty_indices_arr), atom_feats.shape[1]), dtype=atom_feats.dtype)
+            atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
+
+            batch = np.insert(batch, insert_positions, empty_indices_arr)
+        # ------------------------------------------------------------------
+
+        atom_feats = torch.from_numpy(atom_feats)
+        bond_feats = torch.from_numpy(bond_feats)
+        edge_index = torch.from_numpy(edge_index)
+        rev_edge_index = torch.from_numpy(rev_edge_index)
+        batch = torch.from_numpy(batch)
+
+        if atom_features_extra is not None:
+            atom_features_extra = torch.tensor(atom_features_extra, dtype=torch.float32)
+            atom_feats = torch.cat((atom_feats, atom_features_extra), dim=1)
+        if bond_features_extra is not None:
+            bond_features_extra = np.repeat(bond_features_extra, repeats=2, axis=0)
+            bond_features_extra = torch.tensor(bond_features_extra, dtype=torch.float32)
+            bond_feats = torch.cat((bond_feats, bond_features_extra), dim=1)
+
+        return BatchCuikMolGraph(
+            V=atom_feats,
+            E=bond_feats,
+            edge_index=edge_index,
+            rev_edge_index=rev_edge_index,
+            batch=batch,
+        )
 
 
 if __name__ == "__main__":
@@ -94,7 +163,7 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
+    featurizer = PatchedCuikmolmakerMolGraphFeaturizer(FEATURIZER)
 
     train_dataset = ChempropChunkwiseZarrDataset(
         train_smiles,
@@ -106,12 +175,9 @@ if __name__ == "__main__":
         validation_store,
         featurizer,
     )
-    
-    train_sampler = ShardAwareSampler(train_dataset, batches_per_shard, shuffle=True)
-    val_sampler = ShardAwareSampler(val_dataset, batches_per_shard, shuffle=False)
 
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, sampler=train_sampler, num_workers=4, persistent_workers=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, sampler=val_sampler, num_workers=4, persistent_workers=True)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, shuffle=True, num_workers=2, persistent_workers=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True)
 
     model = MPNN(
         MultiweightMessagePassing(
@@ -161,6 +227,7 @@ if __name__ == "__main__":
         check_val_every_n_epoch=1,
         callbacks=callbacks,
         use_distributed_sampler=False,
+        val_check_interval=0.5,
     )
     trainer.fit(model, train_dataloader, val_dataloader)
     ckpt_path = trainer.checkpoint_callback.best_model_path

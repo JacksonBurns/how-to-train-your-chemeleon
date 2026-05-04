@@ -89,8 +89,14 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    atom_featurizer = RIGRAtomFeaturizer() if FEATURIZER == "rigr" else MultiHotAtomFeaturizer.v2()
-    bond_featurizer = RIGRBondFeaturizer() if FEATURIZER == "rigr" else MultiHotBondFeaturizer()
+    if FEATURIZER.upper() == "RIGR":
+        atom_featurizer = RIGRAtomFeaturizer()
+        bond_featurizer = RIGRBondFeaturizer()
+    elif FEATURIZER.upper() == "DEFAULT":
+        atom_featurizer = MultiHotAtomFeaturizer.v2()
+        bond_featurizer = MultiHotBondFeaturizer()
+    else:
+        raise ValueError(f"Valid featurizers are 'RIGR' and 'DEFAULT', got {FEATURIZER}")
     featurizer = SimpleMoleculeMolGraphFeaturizer(atom_featurizer=atom_featurizer, bond_featurizer=bond_featurizer)
 
     train_dataset = ChempropChunkwiseZarrDataset(

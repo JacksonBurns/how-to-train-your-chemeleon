@@ -33,13 +33,16 @@ This repository is laid out like this:
 │   ├── dataset.py  # dataset class for loading from Zarr in a Chemprop-compatible way
 │   ├── random_dropout_mse.py  # random masking MSE used in the paper, re-written as a Chemprop-compatible loss function
 │   ├── split.py  # splits data into training and validation, then applies winsorization and rescaling
+│   ├── now.py  # helper for setting output directory across processes
+│   ├── multiweight_message_passing.py  # Chemprop bond message passing, except with multiple hidden matrices
 │   └── train.py  # training driver script
 └── README.md  # this file
 ```
 
 ## Hardware
 
-
+This model was trained on 8 x NVIDIA 2080Tis - you can train on a single GPU with some more patience.
+Training on CPU is likely too slow for the size of models intended to be built here, though it will _run_.
 
 ## Installation
 
@@ -56,7 +59,3 @@ Each is coded to use either a text-based input file, or a Parquet file.
 You can readily change between the two by modifying the code.
 
 Next step is to pre-train your model - simply set your preferred hyperparameters in `config.py` and then execute `train.py`.
-
-Finally, running fine-tuning using using your pre-trained model.
-If you use `FEATURIZER = "default"`, you can use your trained model in the Chemprop CLI with just the `--from-foundation` argument.
-If you switch to `FEATURIZER = "rigr"`, you will need to add that option in the CLI with `--multi-hot-atom-featurizer-mode RIGR`.

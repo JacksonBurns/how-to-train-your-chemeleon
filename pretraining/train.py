@@ -198,6 +198,7 @@ if __name__ == "__main__":
         warmup_epochs=WARMUP_EPOCHS,
     )
     rank_zero_info(model)
+    model = torch.compile(model)
 
     tensorboard_logger = TensorBoardLogger(
         output_dir,
@@ -226,7 +227,6 @@ if __name__ == "__main__":
         enable_checkpointing=True,
         check_val_every_n_epoch=1,
         callbacks=callbacks,
-        use_distributed_sampler=False,
         val_check_interval=0.5,
     )
     trainer.fit(model, train_dataloader, val_dataloader)

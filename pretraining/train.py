@@ -20,6 +20,7 @@ import cuik_molmaker
 from config import (
     EPOCHS,
     FEATURIZER,
+    LR_MULTIPLIER,
     FINAL_LEARNING_RATE,
     FNN_ACTIVATION,
     FNN_HIDDEN_LAYERS,
@@ -138,6 +139,7 @@ if __name__ == "__main__":
         f.write(f"FNN_HIDDEN_SIZE: {FNN_HIDDEN_SIZE}\n")
         f.write(f"INITIAL_LEARNING_RATE: {INITIAL_LEARNING_RATE}\n")
         f.write(f"MAXIMUM_LEARNING_RATE: {MAXIMUM_LEARNING_RATE}\n")
+        f.write(f"LR_MULTIPLIER: {LR_MULTIPLIER}\n")
         f.write(f"MP_ACTIVATION: {MP_ACTIVATION}\n")
         f.write(f"MP_DEPTH: {MP_DEPTH}\n")
         f.write(f"MP_HIDDEN_SIZE: {MP_HIDDEN_SIZE}\n")

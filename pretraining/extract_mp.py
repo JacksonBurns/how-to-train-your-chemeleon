@@ -20,4 +20,7 @@ if out.exists():
     exit(1)
 
 m = MPNN.load_from_checkpoint(ckpt, map_location="cpu")
-torch.save({"hparams": m.message_passing.hparams, "state_dict": m.message_passing.state_dict()}, out)
+hps = dict(m.message_passing.hparams)
+hps.pop("cls")
+hps["activation"] = "leakyrelu"
+torch.save({"hyper_params": dict(), "state_dict": m.message_passing.state_dict()}, out)

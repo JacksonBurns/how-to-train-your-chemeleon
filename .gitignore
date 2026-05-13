@@ -3,6 +3,9 @@ molpile_smiles.parquet
 molpile_150M_subset.parquet
 pretraining/chemeleon2_preview
 
+# trash
+.vscode
+
 # my own checking
 demo
 

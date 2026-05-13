@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 
 import polars
@@ -231,7 +232,8 @@ if __name__ == "__main__":
         callbacks=callbacks,
         val_check_interval=0.5,
     )
-    trainer.fit(model, train_dataloader, val_dataloader)
+    restart_ckpt = os.environ.get("RESTART_CKPT", None)
+    trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=restart_ckpt, weights_only=restart_ckpt is None)
     ckpt_path = trainer.checkpoint_callback.best_model_path
     print(f"Reloading best model from checkpoint file: {ckpt_path}")
     model = model.__class__.load_from_checkpoint(ckpt_path, map_location="cpu")

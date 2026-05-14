@@ -25,6 +25,12 @@ class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
         self.W_h = nn.ModuleList([
             nn.Linear(d_h, d_h, bias=bias) for _ in range(self.depth - 1)
         ])
+        
+        # LayerNorms for regularization
+        self.norms = nn.ModuleList([
+            nn.LayerNorm(d_h)
+            for _ in range(self.depth - 1)
+        ])
 
     def setup(
         self,
@@ -45,8 +51,9 @@ class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
 
     def update(self, M_t: Tensor, H_0: Tensor, step: int) -> Tensor:
         """Calculate the updated hidden state using the step-specific weight matrix"""
-        # Select the specific weight matrix for this depth iteration
-        H_t = self.W_h[step](M_t)
+        # Select the specific layernorm/weight matrix for this depth iteration
+        M_norm = self.norms[step](M_t)
+        H_t = self.W_h[step](M_norm)
         H_t = self.tau(H_0 + H_t)
         H_t = self.dropout(H_t)
 

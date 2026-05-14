@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 
 from train import MPNN  # import from here to trigger other imports
+from config import MP_ACTIVATION
 
 
 try:
@@ -22,5 +23,5 @@ if out.exists():
 m = MPNN.load_from_checkpoint(ckpt, map_location="cpu")
 hps = dict(m.message_passing.hparams)
 hps.pop("cls")
-hps["activation"] = "leakyrelu"
+hps["activation"] = MP_ACTIVATION
 torch.save({"hyper_params": dict(), "state_dict": m.message_passing.state_dict()}, out)

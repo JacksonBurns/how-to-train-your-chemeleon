@@ -238,5 +238,3 @@ if __name__ == "__main__":
     print(f"Reloading best model from checkpoint file: {ckpt_path}")
     model = MPNN.load_from_checkpoint(ckpt_path, map_location="cpu")
     trainer.validate(model, val_dataloader)
-    torch.save(model, output_dir / "best.pt")
-    torch.save(model.message_passing, output_dir / "chemeleon2_preview_mp.pt")

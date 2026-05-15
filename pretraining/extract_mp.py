@@ -24,4 +24,4 @@ m = MPNN.load_from_checkpoint(ckpt, map_location="cpu")
 hps = dict(m.message_passing.hparams)
 hps.pop("cls")
 hps["activation"] = MP_ACTIVATION
-torch.save({"hyper_params": dict(), "state_dict": m.message_passing.state_dict()}, out)
+torch.save({"hyper_params": hps, "state_dict": m.message_passing.state_dict()}, out)

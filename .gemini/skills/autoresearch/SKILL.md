@@ -89,7 +89,7 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 The TSV has a header row and these columns:
 
 ```
-commit	performance (description)	memory_gb	status	description
+commit	performance (description)	status	description
 ```
 
 1. git commit hash (short, 7 chars)
@@ -100,10 +100,10 @@ commit	performance (description)	memory_gb	status	description
 Example:
 
 ```
-commit	performance (description)	memory_gb	status	description
-a1b2c3d	0.997900	44.0	keep	baseline
-b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
-c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
+commit	performance (description)	status	description
+a1b2c3d	0.997900	keep	baseline
+b2c3d4e	0.993200	keep	increase LR to 0.04
+c3d4e5f	1.005000	discard	switch to GeLU activation
 d4e5f6g		0.0	crash	double model width (OOM)
 ```
 

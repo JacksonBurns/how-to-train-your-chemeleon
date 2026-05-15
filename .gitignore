@@ -1,6 +1,5 @@
 # preview-related files
-molpile_smiles.parquet
-molpile_150M_subset.parquet
+molpile_*.parquet
 pretraining/chemeleon2_preview
 
 # trash

@@ -8,7 +8,7 @@ import zarr
 import numpy as np
 from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer, BatchCuikMolGraph
 from chemprop.models import MPNN
-from chemprop.nn import NormAggregation, RegressionFFN, metrics
+from chemprop.nn import NormAggregation, RegressionFFN, metrics, BondMessagePassing
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
@@ -34,6 +34,7 @@ from config import (
     PATIENCE,
     WARMUP_EPOCHS,
     CHUNKS_PER_BATCH,
+    MP_TYPE,
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
@@ -146,6 +147,7 @@ if __name__ == "__main__":
         f.write(f"MP_HIDDEN_SIZE: {MP_HIDDEN_SIZE}\n")
         f.write(f"PATIENCE: {PATIENCE}\n")
         f.write(f"WARMUP_EPOCHS: {WARMUP_EPOCHS}\n")
+        f.write(f"MP_TYPE: {MP_TYPE}\n")
 
     training_store = input_dir / "train_rescaled.zarr"
     validation_store = input_dir / "val_rescaled.zarr"
@@ -182,8 +184,9 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=None, shuffle=True, num_workers=2, persistent_workers=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True)
 
+    mp = BondMessagePassing if MP_TYPE == "DEFAULT" else  MultiweightMessagePassing
     model = MPNN(
-        MultiweightMessagePassing(
+        mp(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
             d_h=MP_HIDDEN_SIZE,
@@ -235,6 +238,4 @@ if __name__ == "__main__":
     restart_ckpt = os.environ.get("RESTART_CKPT", None)
     trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=restart_ckpt, weights_only=restart_ckpt is None)
     ckpt_path = trainer.checkpoint_callback.best_model_path
-    print(f"Reloading best model from checkpoint file: {ckpt_path}")
-    model = MPNN.load_from_checkpoint(ckpt_path, map_location="cpu")
-    trainer.validate(model, val_dataloader)
+    rank_zero_info(f"Best model file: {ckpt_path}")

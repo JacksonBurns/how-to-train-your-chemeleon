@@ -18,5 +18,5 @@ class RandomDropoutMSE(MSE):
     ) -> None:
         # overrides parent to generate a randomly initialized mask
         random_mask = (torch.rand_like(targets) > DROPOUT_FRACTION).bool()
-        mask = random_mask if mask is None else torch.logical_or(random_mask, mask)  # i.e., ignore if either mask requests so
+        mask = random_mask if mask is None else torch.logical_and(random_mask, mask)  # i.e., include if both masks requests so
         super().update(preds, targets, mask, weights, lt_mask, gt_mask)

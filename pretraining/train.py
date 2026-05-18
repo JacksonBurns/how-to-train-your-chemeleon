@@ -234,7 +234,6 @@ if __name__ == "__main__":
         check_val_every_n_epoch=1,
         callbacks=callbacks,
         val_check_interval=0.5,
-        accumulate_grad_batches=64,
     )
     restart_ckpt = os.environ.get("RESTART_CKPT", None)
     trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=restart_ckpt, weights_only=restart_ckpt is None)

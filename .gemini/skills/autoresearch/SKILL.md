@@ -99,7 +99,32 @@ $ CUDA_VISIBLE_DEVICES=3 conda run --no-capture-output -n polaris python evaluat
 The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experiment, as shown below:
 
 ```
-
+polaris/pkis2-ret-wt-cls-v2
+|    | Test set   | Target label   | Metric      |    Score |
+|---:|:-----------|:---------------|:------------|---------:|
+|  0 | test       | CLS_RET        | f1          | 0.2      |
+|  1 | test       | CLS_RET        | cohen_kappa | 0.159564 |
+|  2 | test       | CLS_RET        | pr_auc      | 0.434922 |
+|  3 | test       | CLS_RET        | mcc         | 0.235465 |
+|  4 | test       | CLS_RET        | roc_auc     | 0.761401 |
+|  5 | test       | CLS_RET        | accuracy    | 0.849057 |
+polaris/adme-fang-solu-1
+|    | Test set   | Target label   | Metric              |    Score |
+|---:|:-----------|:---------------|:--------------------|---------:|
+|  0 | test       | LOG_SOLUBILITY | r2                  | 0.362662 |
+|  1 | test       | LOG_SOLUBILITY | pearsonr            | 0.609285 |
+|  2 | test       | LOG_SOLUBILITY | explained_var       | 0.370384 |
+|  3 | test       | LOG_SOLUBILITY | mean_absolute_error | 0.399445 |
+|  4 | test       | LOG_SOLUBILITY | spearmanr           | 0.48165  |
+|  5 | test       | LOG_SOLUBILITY | mean_squared_error  | 0.345551 |
+tdcommons/clearance-hepatocyte-az
+|    | Test set   | Target label   | Metric    |    Score |
+|---:|:-----------|:---------------|:----------|---------:|
+|  0 | test       | Y              | spearmanr | 0.186918 |
+tdcommons/bbb-martins
+|    | Test set   | Target label   | Metric   |    Score |
+|---:|:-----------|:---------------|:---------|---------:|
+|  0 | test       | Y              | roc_auc  | 0.858114 |
 ```
 
 You should read through these to understand how well the pretraining worked.

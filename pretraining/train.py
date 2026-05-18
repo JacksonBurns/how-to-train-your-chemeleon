@@ -35,6 +35,7 @@ from config import (
     WARMUP_EPOCHS,
     CHUNKS_PER_BATCH,
     MP_TYPE,
+    PERCENTILE_THRESHOLD,
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
@@ -67,10 +68,6 @@ class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
             add_self_loop,
         )
 
-        # ------------------------------------------------------------------
-        # LOCAL PATCH: Inject dummy nodes for explicitly empty SMILES
-        # Ensures the batch size matches the input length exactly.
-        # ------------------------------------------------------------------
         empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
         if empty_indices:
             empty_indices_arr = np.array(empty_indices, dtype=np.int64)
@@ -85,7 +82,6 @@ class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
             atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
 
             batch = np.insert(batch, insert_positions, empty_indices_arr)
-        # ------------------------------------------------------------------
 
         atom_feats = torch.from_numpy(atom_feats)
         bond_feats = torch.from_numpy(bond_feats)
@@ -148,6 +144,7 @@ if __name__ == "__main__":
         f.write(f"PATIENCE: {PATIENCE}\n")
         f.write(f"WARMUP_EPOCHS: {WARMUP_EPOCHS}\n")
         f.write(f"MP_TYPE: {MP_TYPE}\n")
+        f.write(f"PERCENTILE_THRESHOLD: {PERCENTILE_THRESHOLD}\n")
 
     training_store = input_dir / "train_rescaled.zarr"
     validation_store = input_dir / "val_rescaled.zarr"
@@ -164,6 +161,37 @@ if __name__ == "__main__":
     batches_per_shard = max(1, shard_multiplier // CHUNKS_PER_BATCH)
     
     del z
+
+    # Load baseline precomputed statistics
+    try:
+        means_file = next(input_dir.glob("feature_train_means_*.npy"))
+        stds_file = next(input_dir.glob("feature_train_stds_*.npy"))
+        counts_file = next(input_dir.glob("feature_train_counts_*.npy"))
+        
+        train_means = np.load(means_file)
+        train_stds = np.load(stds_file)
+        train_counts = np.load(counts_file)
+        
+        # Calculate the Coefficient of Variation (CV = std / mean) to account for differing scales
+        # Avoid division-by-zero errors for completely zero columns by adding epsilon
+        eps = 1e-8
+        coef_of_variation = np.abs(train_stds / (np.abs(train_means) + eps))
+        
+        # Determine the cutoff value for the lowest 1% percentile (keeping the top 99%)
+        cutoff_percentile = PERCENTILE_THRESHOLD * 100
+        cv_cutoff = np.percentile(coef_of_variation, cutoff_percentile)
+        count_cutoff = np.percentile(train_counts, cutoff_percentile)
+        
+        # Mask out features falling below either of the percentiles
+        valid_columns_mask = (coef_of_variation >= cv_cutoff) & (train_counts >= count_cutoff)
+        # Construct task weights tensor shape: (n_tasks,) where 1=keep, 0=drop
+        task_weights_tensor = torch.from_numpy(valid_columns_mask.astype(np.float32))
+        
+        print(f"Percentile Filter Applied (Keeping top {(1 - PERCENTILE_THRESHOLD) * 100:.0%}): {int(np.sum(valid_columns_mask))}/{n_features} features active.")
+        print(f"Cutoffs -> Min CV: {cv_cutoff:.6f}, Min Finite Counts: {count_cutoff:.1f}. Dropped {int(np.sum(~valid_columns_mask))} columns.")
+    except Exception as e:
+        rank_zero_info(f"Warning: Processing statistics files failed ({repr(e)}).")
+        exit(1)
 
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
@@ -195,7 +223,7 @@ if __name__ == "__main__":
         ),
         MeanAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE()
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=INITIAL_LEARNING_RATE,

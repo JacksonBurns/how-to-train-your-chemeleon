@@ -1,6 +1,9 @@
 # for data preparation
 WINSORIZATION_FACTOR = 3
 
+# data loading during training - keeps columns above this threshold
+PERCENTILE_THRESHOLD = 0.30
+
 # for training
 DROPOUT_FRACTION = 0.85  # see https://doi.org/10.1039/D5DD00369E for better ideas -> 60% mask = 40% dropout
 EPOCHS = 10

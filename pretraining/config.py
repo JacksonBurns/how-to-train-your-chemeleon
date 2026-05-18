@@ -1,19 +1,20 @@
 # for data preparation
 WINSORIZATION_FACTOR = 3
 
-# data loading during training - keeps columns above this threshold
-PERCENTILE_THRESHOLD = 0.30
+# data loading during training
+COUNT_PERCENTILE_THRESHOLD = 0.05
+CV_PERCENTILE_THRESHOLD = 0.95
 
 # for training
-DROPOUT_FRACTION = 0.15  # see https://doi.org/10.1039/D5DD00369E for better ideas -> 60% mask = 40% dropout
+DROPOUT_FRACTION = 0.15  # see https://doi.org/10.1039/D5DD00369E for better ideas -> e.g. 60% mask = 40% dropout
 EPOCHS = 10
 PATIENCE = 2
-LR_MULTIPLIER = 2.8  # sqrt(8), from: https://arxiv.org/pdf/1705.08741
-INITIAL_LEARNING_RATE = 0.0001 * LR_MULTIPLIER
-MAXIMUM_LEARNING_RATE = 0.001 * LR_MULTIPLIER
-FINAL_LEARNING_RATE = 0.0001 * LR_MULTIPLIER
+LR_MULTIPLIER = 2.3  # sqrt(8), from: https://arxiv.org/pdf/1705.08741
+INITIAL_LEARNING_RATE = 0.00001 * LR_MULTIPLIER
+MAXIMUM_LEARNING_RATE = 0.0001 * LR_MULTIPLIER
+FINAL_LEARNING_RATE = 0.00001 * LR_MULTIPLIER
 WARMUP_EPOCHS = 1
-CHUNKS_PER_BATCH = 2
+CHUNKS_PER_BATCH = 3
 
 # model hyperparameters
 FNN_HIDDEN_SIZE = 1_024

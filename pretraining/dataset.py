@@ -34,8 +34,6 @@ class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
         stop_idx = min(start_idx + self.items_per_batch, self.n_rows)
 
         features = self.featurizer(self.smiles[start_idx:stop_idx].tolist())
-        
-        # Directly slice targets. The dimensions are now guaranteed to match!
         targets = torch.tensor(self.z[start_idx:stop_idx, :], dtype=torch.float32)
         weights = torch.ones((targets.shape[0], 1), dtype=torch.float32)
 

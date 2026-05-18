@@ -35,7 +35,8 @@ from config import (
     WARMUP_EPOCHS,
     CHUNKS_PER_BATCH,
     MP_TYPE,
-    PERCENTILE_THRESHOLD,
+    CV_PERCENTILE_THRESHOLD,
+    COUNT_PERCENTILE_THRESHOLD,
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
@@ -144,7 +145,8 @@ if __name__ == "__main__":
         f.write(f"PATIENCE: {PATIENCE}\n")
         f.write(f"WARMUP_EPOCHS: {WARMUP_EPOCHS}\n")
         f.write(f"MP_TYPE: {MP_TYPE}\n")
-        f.write(f"PERCENTILE_THRESHOLD: {PERCENTILE_THRESHOLD}\n")
+        f.write(f"CV_PERCENTILE_THRESHOLD: {CV_PERCENTILE_THRESHOLD}\n")
+        f.write(f"COUNT_PERCENTILE_THRESHOLD: {COUNT_PERCENTILE_THRESHOLD}\n")
 
     training_store = input_dir / "train_rescaled.zarr"
     validation_store = input_dir / "val_rescaled.zarr"
@@ -182,17 +184,18 @@ if __name__ == "__main__":
         coef_of_variation = np.abs(train_stds / (np.abs(train_means) + eps))
         
         # Determine the cutoff value for the lowest n% percentile
-        cutoff_percentile = PERCENTILE_THRESHOLD * 100
-        cv_cutoff = np.nanpercentile(coef_of_variation, cutoff_percentile)
-        count_cutoff = np.nanpercentile(train_counts, cutoff_percentile)
+        cv_cutoff_percentile = CV_PERCENTILE_THRESHOLD * 100
+        cv_cutoff = np.nanpercentile(coef_of_variation, cv_cutoff_percentile)
+        count_cutoff_percentile = COUNT_PERCENTILE_THRESHOLD * 100
+        count_cutoff = np.nanpercentile(train_counts, count_cutoff_percentile)
 
         # Keep it ONLY if it is not constant AND it is not sparse noise AND it has enough counts
         valid_columns_mask = valid_stds_mask & (coef_of_variation <= cv_cutoff) & (train_counts >= count_cutoff)
         # Construct task weights tensor shape: (n_tasks,) where 1=keep, 0=drop
         task_weights_tensor = torch.from_numpy(valid_columns_mask.astype(np.float32))
         
-        rank_zero_info(f"Percentile Filter Applied (Keeping top {(1 - PERCENTILE_THRESHOLD):.0%}): {int(np.sum(valid_columns_mask))}/{n_features} features active.")
-        rank_zero_info(f"Cutoffs -> Min CV: {cv_cutoff:.6f}, Min Finite Counts: {count_cutoff:.1f}. Dropped {int(np.sum(~valid_columns_mask))} columns.")
+        rank_zero_info(f"Percentile Filter Applied (Keeping top {(1 - CV_PERCENTILE_THRESHOLD):.0%}): {int(np.sum(valid_columns_mask))}/{n_features} features active.")
+        rank_zero_info(f"Cutoffs -> Max CV: {cv_cutoff:.6f}, Min Finite Counts: {count_cutoff:.1f}. Dropped {int(np.sum(~valid_columns_mask))} columns.")
     except Exception as e:
         rank_zero_info(f"Warning: Processing statistics files failed ({repr(e)}).")
         exit(1)
@@ -227,7 +230,7 @@ if __name__ == "__main__":
         ),
         MeanAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION  # , criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),
         metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
         init_lr=INITIAL_LEARNING_RATE,
@@ -236,7 +239,6 @@ if __name__ == "__main__":
         warmup_epochs=WARMUP_EPOCHS,
     )
     rank_zero_info(model)
-    model = torch.compile(model)
 
     tensorboard_logger = TensorBoardLogger(
         output_dir,

@@ -8,7 +8,7 @@ import zarr
 import numpy as np
 from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer, BatchCuikMolGraph
 from chemprop.models import MPNN
-from chemprop.nn import NormAggregation, RegressionFFN, metrics, BondMessagePassing
+from chemprop.nn import MeanAggregation, RegressionFFN, metrics, BondMessagePassing
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
@@ -193,11 +193,11 @@ if __name__ == "__main__":
             depth=MP_DEPTH,
             activation=MP_ACTIVATION,
         ),
-        NormAggregation(),
+        MeanAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE()
         ),
-        metrics=[RandomDropoutMSE(), metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
+        metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=INITIAL_LEARNING_RATE,
         max_lr=MAXIMUM_LEARNING_RATE,
         final_lr=FINAL_LEARNING_RATE,
@@ -234,6 +234,7 @@ if __name__ == "__main__":
         check_val_every_n_epoch=1,
         callbacks=callbacks,
         val_check_interval=0.5,
+        accumulate_grad_batches=64,
     )
     restart_ckpt = os.environ.get("RESTART_CKPT", None)
     trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=restart_ckpt, weights_only=restart_ckpt is None)

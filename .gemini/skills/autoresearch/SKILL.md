@@ -1,13 +1,12 @@
 ---
 name: autoresearch
 description:
-   You are an AI assistant whose job is to autonomously perform research (an "experiment") towards improving the `CheMeleon` foundation model, eventually arriving at `CheMeleon2`.
+   Autonomously research how to improve CheMeleon
 ---
 
 # autoresearch
 
 You are an AI assistant whose job is to autonomously perform research (an "experiment") towards improving the `CheMeleon` foundation model, eventually arriving at `CheMeleon2`.
-
 
 ## Setup
 
@@ -15,12 +14,13 @@ To set up a new experiment, work with the user to:
 
 1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`).
 2. **Create the branch**: checkout a new branch with a name derived from the current branch, i.e. `git checkout -b <current_name>-autoresearch-mar5`
-3. **Read the in-scope files**: The repo is small. Read these files for full context:
+3. **Get the data**: ask the user for the location of the pre-split training and validation data from the `split.py` script
+4. **Read the in-scope files**: The repo is small. Read these files for full context:
    - `README.md` and `GEMINI.md` — repository context.
    - `pretraining/` - the files you modify.
    Model architecture, optimizer, training loop, etc. are all defined in here.
-4. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
-5. **Confirm and go**: Confirm setup looks good.
+5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
+6. **Confirm and go**: Confirm setup looks good.
 
 Once you get confirmation, kick off the experimentation.
 
@@ -70,14 +70,16 @@ Edit the training routine and model architecture in ways not reflected in the `c
 Your first step in each experiment, running the training script, should look like this:
 
 ```bash
-conda run --no-capture-output -n httyc python train.py /datac/molpile_2M_subset_split/ chemeleon2 &> train_output.log
+conda run --no-capture-output -n httyc python train.py /path/to/data_split chemeleon2 &> train_output.log
 ```
 
 This will redirect all output to `train_output.log` which you can read after the run finishes - note that the runs can take a long time, so you should not read the log until it finishes (or crashes).
-The single most important line is shown below, which tells you where to find the best model checkpoint (the one you will use for evaluation).
+The last two lines of the file (read them with `tail`) tell you where to find the best model checkpoint (the one you will use for evaluation) and what the validation performance was for that checkpoint.
+Example:
 
 ```bash
-Best model file: chemeleon2_preview/2026-05-14_15-53-28/checkpoints/epoch=5-step=1000.ckpt
+Best model validation metrics: [{'val/mse': 0.2836931347846985, 'val/mae': 0.26995477080345154, 'val/r2': 0.30225974321365356, 'val/rmse': 0.5326285362243652, 'val_loss': 0.3268914520740509}]
+Best model file: /home/jwburns/how-to-train-your-chemeleon/pretraining/chemeleon2/2026-05-18_18-01-04/checkpoints/epoch=0-step=182.ckpt
 ```
 
 You should then run the `extract_mp.py` file to retrieve the message passing weights (the actual foundation model).
@@ -96,7 +98,7 @@ Finally, use this command (notice the different conda environment and the `CUDA_
 $ CUDA_VISIBLE_DEVICES=3 conda run --no-capture-output -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt &> eval_output.log
 ```
 
-The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experiment, as shown below:
+The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experiment (among other unimportant output), as shown below:
 
 ```
 polaris/pkis2-ret-wt-cls-v2
@@ -138,21 +140,22 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 The TSV has a header row and these columns:
 
 ```
-commit	performance (description)	status	description
+commit	performance (description)  pretraining mse	status	description
 ```
 
 1. git commit hash (short, 7 chars)
 2. evaluation performance achieved (e.g. 1.234567) — use a blank for crashes
-3. status: `keep`, `discard`, or `crash`
-4. short text description of what this experiment tried
+3. pretraining MSE (the `val/mse` metric from the training log) — use a blank for crashes
+4. status: `keep`, `discard`, or `crash`
+5. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	performance (description)	status	description
-a1b2c3d	0.997900	keep	baseline
-b2c3d4e	0.993200	keep	increase LR to 0.04
-c3d4e5f	1.005000	discard	switch to GeLU activation
+commit	performance (description)  pretraining mse	status	description
+a1b2c3d	0.997900	0.283693	keep	baseline
+b2c3d4e	0.993200	0.326891	keep	increase LR to 0.04
+c3d4e5f	1.005000	0.345551	discard	switch to GeLU activation
 d4e5f6g		0.0	crash	double model width (OOM)
 ```
 

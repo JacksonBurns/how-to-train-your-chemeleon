@@ -7,6 +7,7 @@ hparams.yaml
 *.pt
 config.txt
 results.txt
+*.parquet
 
 # trash
 .vscode

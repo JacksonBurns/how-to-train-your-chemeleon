@@ -230,7 +230,7 @@ if __name__ == "__main__":
         ),
         MeanAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION  # , criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),
         metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
         init_lr=INITIAL_LEARNING_RATE,
@@ -272,4 +272,8 @@ if __name__ == "__main__":
     restart_ckpt = os.environ.get("RESTART_CKPT", None)
     trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=restart_ckpt, weights_only=restart_ckpt is None)
     ckpt_path = trainer.checkpoint_callback.best_model_path
+    # get the validation performance
+    model = MPNN.load_from_checkpoint(ckpt_path)
+    val_metrics = trainer.validate(model, val_dataloader, verbose=False)
+    rank_zero_info(f"Best model validation metrics: {val_metrics}")
     rank_zero_info(f"Best model file: {ckpt_path}")

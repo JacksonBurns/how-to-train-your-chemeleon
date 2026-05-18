@@ -65,7 +65,12 @@ Edit the training routine and model architecture in ways not reflected in the `c
 
 **The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
 
-## Output format
+## Experiment Commands and Output Format
+
+All of these commands should be run from the `pretraining` directory within this repository.
+Many will redirect all output to `train_output.log` (or similar) which you can read after the run finishes.
+Note that each of these commands can take a *long time*.
+You should run these in the background and check on it **EVERY FEW MINUTES, not continually** - you may stop execution and exit the experiment early if any command takes more than 2 hours.
 
 Your first step in each experiment, running the training script, should look like this:
 
@@ -73,7 +78,6 @@ Your first step in each experiment, running the training script, should look lik
 conda run --no-capture-output -n httyc python train.py /path/to/data_split chemeleon2 &> train_output.log
 ```
 
-This will redirect all output to `train_output.log` which you can read after the run finishes - note that the runs can take a long time, so you should not read the log until it finishes (or crashes).
 The last two lines of the file (read them with `tail`) tell you where to find the best model checkpoint (the one you will use for evaluation) and what the validation performance was for that checkpoint.
 Example:
 
@@ -131,7 +135,7 @@ tdcommons/bbb-martins
 
 You should read through these to understand how well the pretraining worked.
 Devise a single scalar-valued performance metric that you will use to compare experiments (e.g. a specific metric or a weighted combination of metrics).
-Provide a concise description of this summary metric (the "performance (description)" column in the tsv) so that a human can understand what it means, including if higher or lower is better.
+Provide a concise description of this summary metric (the "performance (description)" column in the tsv) so that a human can understand what it means, including if higher or lower is better, in the output header.
 
 ## Logging results
 
@@ -140,7 +144,7 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 The TSV has a header row and these columns:
 
 ```
-commit	performance (description)  pretraining mse	status	description
+commit	performance (<your description here>)  pretraining mse	status	description
 ```
 
 1. git commit hash (short, 7 chars)
@@ -168,7 +172,7 @@ LOOP FOREVER:
 1. Look at the git state: the current branch/commit we're on
 2. Tune `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py` with an experimental idea by directly hacking the code.
 3. git commit
-4. Run the experiment by following the instructions in the [Output format](#output-format) section above, making sure to redirect output to a log file so that it doesn't flood your context.
+4. Run the experiment by following the instructions in the [Experiment Commands and Output Format](#experiment-commands-and-output-format) section above, making sure to use the redirect output to a log file so that it doesn't flood your context.
 5. Read out the results from `results.txt` which will be written by `evaluate.py` on each run.
 6. If the run crashed at any stage, read the Python stack trace and attempt a fix.
 If you can't get things to work after more than two attempts, give up.

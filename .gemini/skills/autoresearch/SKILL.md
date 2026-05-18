@@ -8,6 +8,9 @@ description:
 
 You are an AI assistant whose job is to autonomously perform research (an "experiment") towards improving the `CheMeleon` foundation model, eventually arriving at `CheMeleon2`.
 
+> **NOTE**
+> This research involves running many long-running shell commands - DO NOT run these commands in the background, just run them in the foreground and wait patiently for them to finish before checking results, reading output files, etc.
+
 ## Setup
 
 To set up a new experiment, work with the user to:
@@ -70,7 +73,7 @@ Edit the training routine and model architecture in ways not reflected in the `c
 All of these commands should be run from the `pretraining` directory within this repository.
 Many will redirect all output to `train_output.log` (or similar) which you can read after the run finishes.
 Note that each of these commands can take a *long time*.
-You should run these in the background and check on it **EVERY FEW MINUTES, not continually** - you may stop execution and exit the experiment early if any command takes more than 2 hours.
+You should run these in the foreground and wait for the output - DO NOT send them to background, just wait patiently for them to exit and then check status, read output files, etc.
 
 Your first step in each experiment, running the training script, should look like this:
 

@@ -172,23 +172,27 @@ if __name__ == "__main__":
         train_stds = np.load(stds_file)
         train_counts = np.load(counts_file)
         
+        # drop totally boring
+        valid_stds_mask = train_stds > 1e-6
+        rank_zero_info(f"Initial feature filtering based on std > 1e-6: Keeping {valid_stds_mask.sum()}/{n_features} features.")
+        
         # Calculate the Coefficient of Variation (CV = std / mean) to account for differing scales
         # Avoid division-by-zero errors for completely zero columns by adding epsilon
         eps = 1e-8
         coef_of_variation = np.abs(train_stds / (np.abs(train_means) + eps))
         
-        # Determine the cutoff value for the lowest 1% percentile (keeping the top 99%)
+        # Determine the cutoff value for the lowest n% percentile
         cutoff_percentile = PERCENTILE_THRESHOLD * 100
-        cv_cutoff = np.percentile(coef_of_variation, cutoff_percentile)
-        count_cutoff = np.percentile(train_counts, cutoff_percentile)
-        
-        # Mask out features falling below either of the percentiles
-        valid_columns_mask = (coef_of_variation >= cv_cutoff) & (train_counts >= count_cutoff)
+        cv_cutoff = np.nanpercentile(coef_of_variation, cutoff_percentile)
+        count_cutoff = np.nanpercentile(train_counts, cutoff_percentile)
+
+        # Keep it ONLY if it is not constant AND it is not sparse noise AND it has enough counts
+        valid_columns_mask = valid_stds_mask & (coef_of_variation <= cv_cutoff) & (train_counts >= count_cutoff)
         # Construct task weights tensor shape: (n_tasks,) where 1=keep, 0=drop
         task_weights_tensor = torch.from_numpy(valid_columns_mask.astype(np.float32))
         
-        print(f"Percentile Filter Applied (Keeping top {(1 - PERCENTILE_THRESHOLD) * 100:.0%}): {int(np.sum(valid_columns_mask))}/{n_features} features active.")
-        print(f"Cutoffs -> Min CV: {cv_cutoff:.6f}, Min Finite Counts: {count_cutoff:.1f}. Dropped {int(np.sum(~valid_columns_mask))} columns.")
+        rank_zero_info(f"Percentile Filter Applied (Keeping top {(1 - PERCENTILE_THRESHOLD):.0%}): {int(np.sum(valid_columns_mask))}/{n_features} features active.")
+        rank_zero_info(f"Cutoffs -> Min CV: {cv_cutoff:.6f}, Min Finite Counts: {count_cutoff:.1f}. Dropped {int(np.sum(~valid_columns_mask))} columns.")
     except Exception as e:
         rank_zero_info(f"Warning: Processing statistics files failed ({repr(e)}).")
         exit(1)
@@ -225,7 +229,7 @@ if __name__ == "__main__":
         predictor=RegressionFFN(
             n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),
-        metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
+        metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
         init_lr=INITIAL_LEARNING_RATE,
         max_lr=MAXIMUM_LEARNING_RATE,
         final_lr=FINAL_LEARNING_RATE,

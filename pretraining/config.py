@@ -5,7 +5,7 @@ WINSORIZATION_FACTOR = 3
 PERCENTILE_THRESHOLD = 0.30
 
 # for training
-DROPOUT_FRACTION = 0.85  # see https://doi.org/10.1039/D5DD00369E for better ideas -> 60% mask = 40% dropout
+DROPOUT_FRACTION = 0.15  # see https://doi.org/10.1039/D5DD00369E for better ideas -> 60% mask = 40% dropout
 EPOCHS = 10
 PATIENCE = 2
 LR_MULTIPLIER = 2.8  # sqrt(8), from: https://arxiv.org/pdf/1705.08741

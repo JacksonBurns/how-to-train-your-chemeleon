@@ -8,8 +8,6 @@ description:
 
 You are an AI assistant whose job is to autonomously perform research (an "experiment") towards improving the `CheMeleon` foundation model, eventually arriving at `CheMeleon2`.
 
-You will use the conda environment `httyc` to execute all code in this skill, except for `evaluate.py` which will be run in the `polaris` environment.
-Check before execution that you can use these environments.
 
 ## Setup
 
@@ -28,27 +26,37 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment runs on this 8-GPU machine named `mithrim` and is launched from the script `pretraining/train.py`.
-This script requires 2 inputs: the data source (you should ask the user for this) and the output directory (which should just be set to `chemeleon2-autoresearch-mar5` or i.e. match the branch name)
+Each experiment runs on this 8-GPU machine named `mithrim` and is launched from the script `train.py` within the `pretraining` directory.
+This script requires 2 inputs: the pre-split training and validation data (you should ask the user for this) and the output directory (which should just be set to `chemeleon2-autoresearch-mar5` or i.e. match the branch name)
 
 **What you CAN do:**
 
- - Modify model architecture by changing `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py`.Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+ - Modify model architecture by changing `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py`.
+ Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
 
 > **NOTE**
 > You are optimizing the architecture on a subset of the available training data - the true scale is about 50x larger, so some parameters like batch size may not be as pertinent.
 
 **What you CANNOT do:**
 
- - Modify the evaluation code (`evaluate.py`) - except to make it compatible with the model loading logic, e.g. aggregation function, according to your changes - or the utility code in `now.py` and `split.py`.
+ - Modify the evaluation code (`evaluate.py`) **EXCEPT** to make it compatible with the model loading logic, e.g. aggregation function, according to your changes
+ - Modify the utility code in `now.py` and `split.py`.
+ These are not related to the model or training, and should be left alone.
  - Modify training or validation data - this should remain as exactly what the user requests.
  - Install new packages or add dependencies. You can only use what's already installed in the `httyc` conda environment.
 
-**The goal is simple: get the best evaluation performance.** Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size. The only constraint is that the code runs without crashing and finishes within the time budget.
+**The goal is simple: get the best evaluation performance.** Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size.
+The only constraint is that the code runs without crashing and finishes within the time budget.
 
 **VRAM** is a soft constraint. Some increase is acceptable for meaningful performance gains, but it should not blow up dramatically.
+Arbitrarily large increases may cause the run to crash.
+If a run crashes due to OOM, you can try to fix it by reducing batch size or model size, but if the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
 
-**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.001 improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
+**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it.
+Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win.
+When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude.
+A 0.001 improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 improvement from deleting code? Definitely keep.
+An improvement of ~0 but much simpler code? Keep.
 
 **Exploration diversity**: Don't just tweak hyperparameters given in `config.py`.
 Alternate between categories: architecture (depth, width, attention), optimization (LR, batch size, schedules), regularization, and simplification (removing components).
@@ -59,28 +67,44 @@ Edit the training routine and model architecture in ways not reflected in the `c
 
 ## Output format
 
-Once the `pretraining/train.py` script finishes, it prints a path to the trained model like this:
+Your first step in each experiment, running the training script, should look like this:
 
+```bash
+conda run --no-capture-output -n httyc python train.py /datac/molpile_2M_subset_split/ chemeleon2 &> train_output.log
 ```
+
+This will redirect all output to `train_output.log` which you can read after the run finishes - note that the runs can take a long time, so you should not read the log until it finishes (or crashes).
+The single most important line is shown below, which tells you where to find the best model checkpoint (the one you will use for evaluation).
+
+```bash
 Best model file: chemeleon2_preview/2026-05-14_15-53-28/checkpoints/epoch=5-step=1000.ckpt
 ```
 
-You should then run the `pretraining/extract_mp.py` file to retrieve the message passing weights (the actual foundation model).
+You should then run the `extract_mp.py` file to retrieve the message passing weights (the actual foundation model).
 This script will also print the filepath to the new weights.
 Example:
 
-```
-$python extract_mp.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750.ckpt 
-/home/jwburns/miniforge3/envs/httyc/lib/python3.13/site-packages/cuik_molmaker/mol_features.py:10: output will be written to '/home/jwburns/how-to-train-your-chemeleon/pretraining/chemeleon2/2026-05-15_15-20-51/checkpoints/epoch=0-step=750_mp.pt'
+```bash
+$conda run --no-capture-output -n httyc python extract_mp.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750.ckpt 
+
+output will be written to '/home/jwburns/how-to-train-your-chemeleon/pretraining/chemeleon2/2026-05-15_15-20-51/checkpoints/epoch=0-step=750_mp.pt'
 ```
 
-Finally, the evaluation script prints a series of benchmarks names and their corresponding tables showing important performance metrics.
-You should read through these (they are printed at the end of the script) to understand how well the pretraining worked.
-You should devise a way to summarize these metrics into a single scalar that is monotonic for you to focus on improving (make it clear in your experiments how you do so by setting the header in the output file to an appropriate description).
+Finally, use this command (notice the different conda environment and the `CUDA_VISIBLE_DEVICES=3` prefix) to run the evaluation script on the extracted message passing weights.
+
+```bash
+$ CUDA_VISIBLE_DEVICES=3 conda run --no-capture-output -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt &> eval_output.log
+```
+
+The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experiment, as shown below:
 
 ```
-$ CUDA_VISIBLE_DEVICES=3 conda run -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt 
+
 ```
+
+You should read through these to understand how well the pretraining worked.
+Devise a single scalar-valued performance metric that you will use to compare experiments (e.g. a specific metric or a weighted combination of metrics).
+Provide a concise description of this summary metric (the "performance (description)" column in the tsv) so that a human can understand what it means, including if higher or lower is better.
 
 ## Logging results
 
@@ -116,9 +140,7 @@ LOOP FOREVER:
 1. Look at the git state: the current branch/commit we're on
 2. Tune `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py` with an experimental idea by directly hacking the code.
 3. git commit
-4. Run the experiment by executing `train.py`, then `extract_mp.py`, and finally `evaluate.py` - this last script should always be run with `CUDA_VISIBLE_DEVICES=3 python evaluate.py ...` to ensure it uses only one GPU.
- Example: `CUDA_VISIBLE_DEVICES=3 conda run -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt`
- (redirect everything for all scripts — do NOT use tee or let output flood your context)
+4. Run the experiment by following the instructions in the [Output format](#output-format) section above, making sure to redirect output to a log file so that it doesn't flood your context.
 5. Read out the results from `results.txt` which will be written by `evaluate.py` on each run.
 6. If the run crashed at any stage, read the Python stack trace and attempt a fix.
 If you can't get things to work after more than two attempts, give up.

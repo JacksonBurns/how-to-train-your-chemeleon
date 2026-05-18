@@ -56,7 +56,9 @@ if __name__ == "__main__":
         targets = train_df[target_cols]
         targets = targets.fillna(targets.mean(axis=0)).to_numpy()
 
-        # chemeleon2_preview setup
+        #########################################
+        # MODEL LOADING LOGIC - you can modify this as needed to be compatible with your model changes, but the evaluation logic should remain the same
+        #########################################
         featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
         _mp = torch.load(mp_path, weights_only=True)
         if MP_TYPE == "UNTIED":
@@ -65,6 +67,10 @@ if __name__ == "__main__":
             mp = BondMessagePassing(**_mp["hyper_params"])
         mp.load_state_dict(_mp["state_dict"])
         agg = NormAggregation()
+        #########################################
+        # END OF MODEL LOADING LOGIC
+        #########################################
+        
         hidden_size = mp.output_dim
 
         # typical chemprop training

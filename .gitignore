@@ -1,6 +1,12 @@
 # preview-related files
 molpile_*.parquet
 pretraining/chemeleon2_preview
+*.ckpt
+*.tfevents.*
+hparams.yaml
+*.pt
+config.txt
+results.txt
 
 # trash
 .vscode

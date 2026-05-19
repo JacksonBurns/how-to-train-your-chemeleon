@@ -5,3 +5,4 @@ f446a23	0.607032	0.070676	keep	baseline
 5a64464			crash	Try ELU for MP_ACTIVATION
 095039c	0.637340	0.062362	discard	Increase FNN_HIDDEN_LAYERS to 2
 e28d7c6			crash	Try UNTIED MP_TYPE
+baf9de8	0.639984	0.058081	keep	Reduce MP_DEPTH to 4

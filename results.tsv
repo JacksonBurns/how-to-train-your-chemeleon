@@ -1,2 +1,3 @@
 commit	performance	pretraining mse	status	description
 f446a23	0.607032	0.070676	keep	baseline
+62f32c8	0.639701	0.062212	keep	change DROPOUT_FRACTION to 0.40

@@ -9,7 +9,7 @@ CV_PERCENTILE_THRESHOLD = 0.95
 DROPOUT_FRACTION = 0.40  # see https://doi.org/10.1039/D5DD00369E for better ideas -> e.g. 60% mask = 40% dropout
 EPOCHS = 10
 PATIENCE = 2
-LR_MULTIPLIER = 2.3  # sqrt(8), from: https://arxiv.org/pdf/1705.08741
+LR_MULTIPLIER = 2.828  # sqrt(8), from: https://arxiv.org/pdf/1705.08741
 INITIAL_LEARNING_RATE = 0.0001 * LR_MULTIPLIER
 MAXIMUM_LEARNING_RATE = 0.001 * LR_MULTIPLIER
 FINAL_LEARNING_RATE = 0.0001 * LR_MULTIPLIER

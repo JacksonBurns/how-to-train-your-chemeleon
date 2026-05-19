@@ -2,3 +2,4 @@ commit	performance	pretraining mse	status	description
 f446a23	0.607032	0.070676	keep	baseline
 62f32c8	0.639701	0.062212	keep	change DROPOUT_FRACTION to 0.40
 80f12fd	0.630539	0.059083	discard	Change LR multiplier to actual sqrt(8) (2.828)
+5a64464			crash	Try ELU for MP_ACTIVATION

@@ -59,3 +59,16 @@ Each is coded to use either a text-based input file, or a Parquet file.
 You can readily change between the two by modifying the code.
 
 Next step is to pre-train your model - simply set your preferred hyperparameters in `config.py` and then execute `train.py`.
+
+For `autoresearch` with `gemini`, need to extend shell call idle time:
+
+```json
+{
+  //  2 hours for long running trainings
+  "tools": {
+    "shell": {
+      "inactivityTimeout": 7200
+    }
+  }
+}
+```

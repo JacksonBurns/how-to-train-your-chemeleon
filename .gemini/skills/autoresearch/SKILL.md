@@ -105,40 +105,14 @@ Finally, use this command (notice the different conda environment and the `CUDA_
 $ CUDA_VISIBLE_DEVICES=3 conda run --no-capture-output -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt &> eval_output.log
 ```
 
-The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experiment (among other unimportant output), as shown below:
+The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experimentin particular:
 
 ```
-polaris/pkis2-ret-wt-cls-v2
-|    | Test set   | Target label   | Metric      |    Score |
-|---:|:-----------|:---------------|:------------|---------:|
-|  0 | test       | CLS_RET        | f1          | 0.2      |
-|  1 | test       | CLS_RET        | cohen_kappa | 0.159564 |
-|  2 | test       | CLS_RET        | pr_auc      | 0.434922 |
-|  3 | test       | CLS_RET        | mcc         | 0.235465 |
-|  4 | test       | CLS_RET        | roc_auc     | 0.761401 |
-|  5 | test       | CLS_RET        | accuracy    | 0.849057 |
-polaris/adme-fang-solu-1
-|    | Test set   | Target label   | Metric              |    Score |
-|---:|:-----------|:---------------|:--------------------|---------:|
-|  0 | test       | LOG_SOLUBILITY | r2                  | 0.362662 |
-|  1 | test       | LOG_SOLUBILITY | pearsonr            | 0.609285 |
-|  2 | test       | LOG_SOLUBILITY | explained_var       | 0.370384 |
-|  3 | test       | LOG_SOLUBILITY | mean_absolute_error | 0.399445 |
-|  4 | test       | LOG_SOLUBILITY | spearmanr           | 0.48165  |
-|  5 | test       | LOG_SOLUBILITY | mean_squared_error  | 0.345551 |
-tdcommons/clearance-hepatocyte-az
-|    | Test set   | Target label   | Metric    |    Score |
-|---:|:-----------|:---------------|:----------|---------:|
-|  0 | test       | Y              | spearmanr | 0.186918 |
-tdcommons/bbb-martins
-|    | Test set   | Target label   | Metric   |    Score |
-|---:|:-----------|:---------------|:---------|---------:|
-|  0 | test       | Y              | roc_auc  | 0.858114 |
+SUMMARY_METRIC: 0.997900
 ```
 
-You should read through these to understand how well the pretraining worked.
-Devise a single scalar-valued performance metric that you will use to compare experiments (e.g. a specific metric or a weighted combination of metrics).
-Provide a concise description of this summary metric (the "performance (description)" column in the tsv) so that a human can understand what it means, including if higher or lower is better, in the output header.
+**Higher is better for this metric**.
+You should extract this summary metric and record it in the `results.tsv` file along with the pretraining MSE and a short description of what you changed in this experiment.
 
 ## Logging results
 
@@ -147,11 +121,11 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 The TSV has a header row and these columns:
 
 ```
-commit	performance (<your description here>)  pretraining mse	status	description
+commit	performance  pretraining mse	status	description
 ```
 
 1. git commit hash (short, 7 chars)
-2. evaluation performance achieved (e.g. 1.234567) — use a blank for crashes
+2. evaluation performance achieved (e.g. 0.750) — use a blank for crashes
 3. pretraining MSE (the `val/mse` metric from the training log) — use a blank for crashes
 4. status: `keep`, `discard`, or `crash`
 5. short text description of what this experiment tried
@@ -159,11 +133,11 @@ commit	performance (<your description here>)  pretraining mse	status	description
 Example:
 
 ```
-commit	performance (description)  pretraining mse	status	description
+commit	performance  pretraining mse	status	description
 a1b2c3d	0.997900	0.283693	keep	baseline
 b2c3d4e	0.993200	0.326891	keep	increase LR to 0.04
-c3d4e5f	1.005000	0.345551	discard	switch to GeLU activation
-d4e5f6g		0.0	crash	double model width (OOM)
+c3d4e5f	0.990000	0.345551	discard	switch to GeLU activation
+d4e5f6g			crash	double model width (OOM)
 ```
 
 ## The experiment loop

@@ -43,6 +43,7 @@ if __name__ == "__main__":
         "tdcommons/bbb-martins",
     )
     random_seed = 42
+    summary_scores = []
     result_str = ""
     for benchmark_name in (polaris_benchmarks):
         # load the benchmarking data
@@ -161,10 +162,37 @@ if __name__ == "__main__":
         result_str += benchmark_name + "\n"
         if task_type == TargetType.CLASSIFICATION:
             # we don't 'calibrate models' round these parts...
-            result_str += benchmark.evaluate(predictions > 0.5, predictions).results.to_markdown() + "\n"
+            results = benchmark.evaluate(predictions > 0.5, predictions).results
+            result_str += results.to_markdown() + "\n"
         elif task_type == TargetType.REGRESSION:
-            result_str += benchmark.evaluate(predictions).results.to_markdown() + "\n"
+            results = benchmark.evaluate(predictions).results
+            result_str += results.to_markdown() + "\n"
+        
+        metric_map = {
+            row["Metric"]: row["Score"]
+            for _, row in results.iterrows()
+        }
+
+        # benchmark-specific normalized scalar
+        if benchmark_name == "polaris/pkis2-ret-wt-cls-v2":
+            score = metric_map["roc_auc"]
+
+        elif benchmark_name == "polaris/adme-fang-solu-1":
+            score = max(0.0, metric_map["r2"])
+
+        elif benchmark_name == "tdcommons/clearance-hepatocyte-az":
+            score = max(0.0, metric_map["spearmanr"])
+
+        elif benchmark_name == "tdcommons/bbb-martins":
+            score = metric_map["roc_auc"]
+
+        summary_scores.append(score)
         Path(ckpt_path).unlink()
-    
+
+    summary_metric = float(np.mean(summary_scores))
+
+    print(f"\nSUMMARY_METRIC: {summary_metric:.6f}")
+
     with open("results.txt", "w") as file:
         file.write(result_str)
+        file.write(f"\nSUMMARY_METRIC: {summary_metric:.6f}\n")

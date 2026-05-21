@@ -38,3 +38,4 @@ bcfc153			crash	Try MP_DEPTH=6 with LEAKYRELU
 0a5fe75	0.641707	0.061710	discard	Change MP_HIDDEN_SIZE to 1536
 8396fe4			crash	Enable add_self_loop in featurizer
 3f6faeb	0.643692	0.061053	discard	Change LR_MULTIPLIER to 2.0
+bc059a0	0.430259	0.430259	discard	Change MP_HIDDEN_SIZE to 2560

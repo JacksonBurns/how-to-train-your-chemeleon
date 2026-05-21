@@ -28,3 +28,4 @@ ca6c1c7	0.640842	0.065028	discard	Change MAXIMUM_LEARNING_RATE to 0.0005
 4674534	0.623071	0.305277	discard	Change PATIENCE to 4
 741ee11	0.660591	0.073508	discard	Change FINAL_LEARNING_RATE to 0.00001
 e55d15e	0.622419	0.054645	discard	Change DROPOUT_FRACTION to 0.45
+8ebef6d	0.614829	0.351012	discard	Try SumAggregation instead of MeanAggregation

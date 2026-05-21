@@ -60,7 +60,7 @@ if __name__ == "__main__":
         #########################################
         # MODEL LOADING LOGIC - you can modify this as needed to be compatible with your model changes, but the evaluation logic should remain the same
         #########################################
-        featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
+        featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER, add_h=True)
         _mp = torch.load(mp_path, weights_only=True)
         if MP_TYPE == "UNTIED":
             mp = MultiweightMessagePassing(**_mp["hyper_params"])

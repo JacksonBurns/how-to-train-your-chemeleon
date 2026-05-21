@@ -203,7 +203,7 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    featurizer = PatchedCuikmolmakerMolGraphFeaturizer(FEATURIZER)
+    featurizer = PatchedCuikmolmakerMolGraphFeaturizer(FEATURIZER, add_h=True)
 
     train_dataset = ChempropChunkwiseZarrDataset(
         train_smiles,

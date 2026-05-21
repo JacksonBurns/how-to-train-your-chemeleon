@@ -32,3 +32,4 @@ e55d15e	0.622419	0.054645	discard	Change DROPOUT_FRACTION to 0.45
 31346c8	0.561041	0.069332	discard	Disable feature filtering (COUNT=0.0, CV=1.0)
 a056023	0.620145	0.052647	discard	Add dropout=0.1 to MP layers
 ff0fcf6	0.631608	0.067285	discard	Change FNN_HIDDEN_LAYERS to 0
+3262c61	0.618021	0.058961	discard	Try MP_DEPTH=3, MP_HIDDEN_SIZE=3072

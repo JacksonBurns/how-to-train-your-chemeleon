@@ -14,7 +14,7 @@ from chemprop.data import LazyMoleculeDatapoint, CuikmolmakerDataset, build_data
 from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
 from chemprop.nn import RegressionFFN, UnscaleTransform, BinaryClassificationFFN, BondMessagePassing
-from chemprop.nn.agg import AttentiveAggregation
+from chemprop.nn.agg import MeanAggregation
 from lightning import Trainer
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from polaris.utils.types import TargetType
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         else:
             mp = BondMessagePassing(**_mp["hyper_params"])
         mp.load_state_dict(_mp["state_dict"])
-        agg = AttentiveAggregation(hidden_size, hidden_size)
+        agg = MeanAggregation()
         #########################################
         # END OF MODEL LOADING LOGIC
         #########################################

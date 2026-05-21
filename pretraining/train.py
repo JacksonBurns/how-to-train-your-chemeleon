@@ -39,7 +39,7 @@ from config import (
     COUNT_PERCENTILE_THRESHOLD,
 )
 from dataset import ChempropChunkwiseZarrDataset
-from random_dropout_mse import RandomDropoutMSE, RandomDropoutMAE
+from random_dropout_mse import RandomDropoutMSE
 from multiweight_message_passing import MultiweightMessagePassing
 from now import NOW
 
@@ -230,7 +230,7 @@ if __name__ == "__main__":
         ),
         MeanAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMAE(task_weights=task_weights_tensor)
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),
         metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
         init_lr=INITIAL_LEARNING_RATE,

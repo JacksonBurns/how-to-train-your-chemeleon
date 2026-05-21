@@ -1,5 +1,5 @@
 import torch
-from chemprop.nn.metrics import MAE, MSE, LossFunctionRegistry, MetricRegistry
+from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 
 from config import DROPOUT_FRACTION
 
@@ -18,27 +18,5 @@ class RandomDropoutMSE(MSE):
     ) -> None:
         # overrides parent to generate a randomly initialized mask
         random_mask = (torch.rand_like(targets) > DROPOUT_FRACTION).bool()
-        mask = (
-            random_mask if mask is None else torch.logical_and(random_mask, mask)
-        )  # i.e., include if both masks requests so
-        super().update(preds, targets, mask, weights, lt_mask, gt_mask)
-
-
-@LossFunctionRegistry.register("rdmae")
-@MetricRegistry.register("rdmae")
-class RandomDropoutMAE(MAE):
-    def update(
-        self,
-        preds: torch.Tensor,
-        targets: torch.Tensor,
-        mask: torch.Tensor | None = None,
-        weights: torch.Tensor | None = None,
-        lt_mask: torch.Tensor | None = None,
-        gt_mask: torch.Tensor | None = None,
-    ) -> None:
-        # overrides parent to generate a randomly initialized mask
-        random_mask = (torch.rand_like(targets) > DROPOUT_FRACTION).bool()
-        mask = (
-            random_mask if mask is None else torch.logical_and(random_mask, mask)
-        )  # i.e., include if both masks requests so
+        mask = random_mask if mask is None else torch.logical_and(random_mask, mask)  # i.e., include if both masks requests so
         super().update(preds, targets, mask, weights, lt_mask, gt_mask)

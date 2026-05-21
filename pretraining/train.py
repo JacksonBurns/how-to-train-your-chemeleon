@@ -234,7 +234,7 @@ if __name__ == "__main__":
         ),
         batch_norm=True,
         metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
-        init_lr=INITIAL_LEARNING_RATE,
+    ...
         max_lr=MAXIMUM_LEARNING_RATE,
         final_lr=FINAL_LEARNING_RATE,
         warmup_epochs=WARMUP_EPOCHS,

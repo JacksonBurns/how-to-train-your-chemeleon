@@ -230,7 +230,7 @@ if __name__ == "__main__":
         ),
         MeanAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor), dropout=0.1
         ),
         metrics=[metrics.MSE(task_weights=task_weights_tensor), metrics.MAE(task_weights=task_weights_tensor), metrics.R2Score(task_weights=task_weights_tensor), metrics.RMSE(task_weights=task_weights_tensor)],
         init_lr=INITIAL_LEARNING_RATE,

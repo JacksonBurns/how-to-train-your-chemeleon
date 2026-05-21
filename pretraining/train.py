@@ -8,7 +8,7 @@ import zarr
 import numpy as np
 from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer, BatchCuikMolGraph
 from chemprop.models import MPNN
-from chemprop.nn import NormAggregation, RegressionFFN, metrics, BondMessagePassing
+from chemprop.nn import MeanAggregation, RegressionFFN, metrics, BondMessagePassing
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
@@ -228,7 +228,7 @@ if __name__ == "__main__":
             depth=MP_DEPTH,
             activation=MP_ACTIVATION,
         ),
-        NormAggregation(),
+        MeanAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),

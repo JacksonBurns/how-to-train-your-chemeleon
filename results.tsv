@@ -58,3 +58,4 @@ bfcf43d	0.599673	0.073863	discard	Change FNN_HIDDEN_SIZE to 256
 526fc1c	0.557187	0.063884	discard	Try AttentiveAggregation
 3ade9b0	0.635652	0.029412	discard	Enable batch_norm=True in MPNN
 6cb21f2	0.649171	0.099553	discard	Use RandomDropoutMAE as pretraining criterion
+7af7985	0.659068	0.068901	discard	Try MP_DEPTH=5, MP_HIDDEN_SIZE=1536

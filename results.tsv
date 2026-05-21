@@ -18,3 +18,4 @@ f69b6c1			crash	Change CHUNKS_PER_BATCH to 8
 ef4a267	0.621495	0.065883	discard	Change MP_DEPTH to 3
 4938a55	0.549838	0.301681	discard	Change FNN_HIDDEN_SIZE to 2_048
 90b686e	0.645873	0.045491	discard	Change EPOCHS to 15
+74d53a1	0.592484	0.284323	discard	Change MP_DEPTH to 5

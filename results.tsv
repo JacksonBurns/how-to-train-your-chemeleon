@@ -42,3 +42,4 @@ bc059a0	0.430259	0.430259	discard	Change MP_HIDDEN_SIZE to 2560
 d18ce3b	0.594991	0.268735	discard	Add dropout=0.1 to FNN head
 084fdec			crash	Enable add_h=True in featurizer
 9e74207	0.151343	0.151343	discard	Try MP_DEPTH=8, MP_HIDDEN_SIZE=1024
+d9ee7c2	0.424347	0.424347	discard	Try MP_DEPTH=6, MP_HIDDEN_SIZE=1024, MP_ACTIVATION=ELU

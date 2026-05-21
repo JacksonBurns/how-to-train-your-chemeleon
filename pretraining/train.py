@@ -50,7 +50,7 @@ class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
         atom_features_extra: np.ndarray | None = None,
         bond_features_extra: np.ndarray | None = None,
     ) -> BatchCuikMolGraph:
-        offset_carbon, duplicate_edges, add_self_loop = False, True, True
+        offset_carbon, duplicate_edges, add_self_loop = False, True, False
 
         (
             atom_feats,

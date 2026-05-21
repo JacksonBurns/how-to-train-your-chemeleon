@@ -124,7 +124,7 @@ if __name__ == "__main__":
                 hidden_dim=512,
             )
         )
-        model = MPNN(mp, agg, fnn, batch_norm=True)
+        model = MPNN(mp, agg, fnn)
         callbacks = [
             EarlyStopping(
                 monitor="val_loss",

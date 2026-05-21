@@ -2,8 +2,8 @@
 WINSORIZATION_FACTOR = 3
 
 # data loading during training
-COUNT_PERCENTILE_THRESHOLD = 0.05
-CV_PERCENTILE_THRESHOLD = 0.95
+COUNT_PERCENTILE_THRESHOLD = 0.0
+CV_PERCENTILE_THRESHOLD = 1.0
 
 # for training
 DROPOUT_FRACTION = 0.40  # see https://doi.org/10.1039/D5DD00369E for better ideas -> e.g. 60% mask = 40% dropout

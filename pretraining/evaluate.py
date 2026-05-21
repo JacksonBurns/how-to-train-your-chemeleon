@@ -67,7 +67,7 @@ if __name__ == "__main__":
         else:
             mp = BondMessagePassing(**_mp["hyper_params"])
         mp.load_state_dict(_mp["state_dict"])
-        agg = AttentiveAggregation(dim=0, output_size=hidden_size)
+        agg = AttentiveAggregation(hidden_size, hidden_size)
         #########################################
         # END OF MODEL LOADING LOGIC
         #########################################

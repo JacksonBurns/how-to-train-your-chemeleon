@@ -228,7 +228,7 @@ if __name__ == "__main__":
             depth=MP_DEPTH,
             activation=MP_ACTIVATION,
         ),
-        AttentiveAggregation(dim=0, output_size=MP_HIDDEN_SIZE),
+        AttentiveAggregation(MP_HIDDEN_SIZE, MP_HIDDEN_SIZE),
         predictor=RegressionFFN(
             n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE(task_weights=task_weights_tensor)
         ),

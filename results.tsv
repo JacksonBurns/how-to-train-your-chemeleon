@@ -54,3 +54,4 @@ c36670c	0.553300	0.221052	discard	Enable add_h=True and set CHUNKS_PER_BATCH=1
 c1a9aae	0.424234	0.424234	discard	Change WARMUP_EPOCHS to 0
 e37fa4e	0.637797	0.059316	discard	Try MP_HIDDEN_SIZE=2560 with RELU
 f8877ef	0.627262	0.050080	discard	Change FNN_HIDDEN_SIZE to 1536
+bfcf43d	0.599673	0.073863	discard	Change FNN_HIDDEN_SIZE to 256

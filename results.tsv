@@ -31,3 +31,4 @@ e55d15e	0.622419	0.054645	discard	Change DROPOUT_FRACTION to 0.45
 8ebef6d	0.614829	0.351012	discard	Try SumAggregation instead of MeanAggregation
 31346c8	0.561041	0.069332	discard	Disable feature filtering (COUNT=0.0, CV=1.0)
 a056023	0.620145	0.052647	discard	Add dropout=0.1 to MP layers
+ff0fcf6	0.631608	0.067285	discard	Change FNN_HIDDEN_LAYERS to 0

@@ -227,6 +227,7 @@ if __name__ == "__main__":
             d_h=MP_HIDDEN_SIZE,
             depth=MP_DEPTH,
             activation=MP_ACTIVATION,
+            dropout=0.1,
         ),
         MeanAggregation(),
         predictor=RegressionFFN(

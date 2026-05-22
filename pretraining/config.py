@@ -6,7 +6,7 @@ COUNT_PERCENTILE_THRESHOLD = 0.05
 CV_PERCENTILE_THRESHOLD = 0.95
 
 # for training
-DROPOUT_FRACTION = 0.38  # see https://doi.org/10.1039/D5DD00369E for better ideas -> e.g. 60% mask = 40% dropout
+DROPOUT_FRACTION = 0.40  # see https://doi.org/10.1039/D5DD00369E for better ideas -> e.g. 60% mask = 40% dropout
 EPOCHS = 10
 PATIENCE = 2
 LR_MULTIPLIER = 2.3  # sqrt(8), from: https://arxiv.org/pdf/1705.08741
@@ -20,8 +20,8 @@ CHUNKS_PER_BATCH = 4
 FNN_HIDDEN_SIZE = 1_024
 FNN_HIDDEN_LAYERS = 1
 FNN_ACTIVATION = "RELU"  # one of: RELU, LEAKYRELU, PRELU, TANH, ELU
-MP_HIDDEN_SIZE = 1_536
-MP_DEPTH = 5
+MP_HIDDEN_SIZE = 2_048
+MP_DEPTH = 4
 MP_ACTIVATION = "LEAKYRELU"  # one of: RELU, LEAKYRELU, PRELU, TANH, ELU
 FEATURIZER = "V2"  # one of: "V2", "RIGR"
 MP_TYPE = "DEFAULT"  # one of: "DEFAULT", "UNTIED"

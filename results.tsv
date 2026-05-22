@@ -1,2 +1,11 @@
 commit	performance	pretraining mse	status	description
 97e3e2b	0.557964	0.420272	keep	baseline
+954c740	0.583809	0.420270	keep	reduce DROPOUT_FRACTION to 0.6
+7880f23			crash	switch activation to GELU (unsupported by chemprop)
+2180edf			crash	switch MP_TYPE to UNTIED (OOM at 2048 hidden size)
+7fce705	0.572521	0.420270	discard	reduce DROPOUT_FRACTION to 0.4
+e87e9ca	0.527820	0.420269	discard	increase FNN_HIDDEN_LAYERS to 2
+9dccb54	0.556860	0.420269	discard	switch FEATURIZER to RIGR
+42d30e9	0.542744	0.420271	discard	MP_DEPTH=8, MP_HIDDEN_SIZE=1600
+3bb0faf	0.393538	0.420270	discard	switch to UNTIED MP with 1600 hidden size
+169f58b			crash	switch MP_ACTIVATION to LEAKYRELU (OOM)

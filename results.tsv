@@ -70,3 +70,4 @@ c302f06			crash	Disable duplicate_edges in featurizer
 8754d3e	0.212904	0.212904	discard	Try MP_DEPTH=6, MP_HIDDEN_SIZE=1536
 e7f0589	0.658264	0.051056	discard	Try MP_HIDDEN_SIZE=1536, FNN_HIDDEN_SIZE=1536
 2bff5b1	0.629956	0.040237	discard	Try NormAggregation(norm=1)
+b5a18ae	0.258094	0.258094	discard	Try MP_DEPTH=5, MP_HIDDEN_SIZE=1536, FNN_ACTIVATION=ELU

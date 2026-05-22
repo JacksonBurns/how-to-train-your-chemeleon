@@ -34,7 +34,7 @@ This script requires 2 inputs: the pre-split training and validation data (you s
 
 **What you CAN do:**
 
- - Modify model architecture by changing `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py`.
+ - Modify model architecture by changing `pretraining/train.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/config.py`.
  Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
 
 > **NOTE**
@@ -42,14 +42,31 @@ This script requires 2 inputs: the pre-split training and validation data (you s
 
 **What you CANNOT do:**
 
- - Modify the evaluation code (`evaluate.py`) **EXCEPT** to make it compatible with the model loading logic, e.g. aggregation function, according to your changes
+ - Modify the evaluation code (`evaluate.py`) **EXCEPT** to make it compatible with the model loading logic, e.g. aggregation function, according to your changes:
+
+```python
+        #########################################
+        # MODEL LOADING LOGIC - you can modify this as needed to be compatible with your model changes, but the evaluation logic should remain the same
+        #########################################
+        featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
+        _mp = torch.load(mp_path, weights_only=True)
+        if MP_TYPE == "UNTIED":
+            mp = MultiweightMessagePassing(**_mp["hyper_params"])
+        else:
+            mp = BondMessagePassing(**_mp["hyper_params"])
+        mp.load_state_dict(_mp["state_dict"])
+        agg = MeanAggregation()
+        #########################################
+        # END OF MODEL LOADING LOGIC
+        #########################################
+```
+
  - Modify the utility code in `now.py` and `split.py`.
  These are not related to the model or training, and should be left alone.
- - Modify training or validation data - this should remain as exactly what the user requests.
  - Install new packages or add dependencies. You can only use what's already installed in the `httyc` conda environment.
 
 **The goal is simple: get the best evaluation performance.** Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size.
-The only constraint is that the code runs without crashing and finishes within the time budget.
+The only constraint is that the code runs without crashing.
 
 **VRAM** is a soft constraint. Some increase is acceptable for meaningful performance gains, but it should not blow up dramatically.
 Arbitrarily large increases may cause the run to crash.
@@ -62,8 +79,6 @@ A 0.001 improvement that adds 20 lines of hacky code? Probably not worth it. A 0
 An improvement of ~0 but much simpler code? Keep.
 
 **Exploration diversity**: Don't just tweak hyperparameters given in `config.py`.
-Alternate between categories: architecture (depth, width, attention), optimization (LR, batch size, schedules), regularization, and simplification (removing components).
-If your last 3 experiments were all in the same category, try a different one.
 Edit the training routine and model architecture in ways not reflected in the `config.py` file - anything to improve the model.
 
 **The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
@@ -126,7 +141,7 @@ commit	performance  pretraining mse	status	description
 
 1. git commit hash (short, 7 chars)
 2. evaluation performance achieved (e.g. 0.750) — use a blank for crashes
-3. pretraining MSE (the `val/mse` metric from the training log) — use a blank for crashes
+3. pretraining MSE (the `val/mse` metric from the training log) for informational purposes ONLY — use a blank for crashes
 4. status: `keep`, `discard`, or `crash`
 5. short text description of what this experiment tried
 

@@ -175,10 +175,10 @@ if __name__ == "__main__":
 
         # benchmark-specific normalized scalar
         if benchmark_name == "polaris/pkis2-ret-wt-cls-v2":
-            score = metric_map["roc_auc"]
+            score = metric_map["pr_auc"]
 
         elif benchmark_name == "polaris/adme-fang-solu-1":
-            score = max(0.0, metric_map["r2"])
+            score = max(0.0, metric_map["pearsonr"])
 
         elif benchmark_name == "tdcommons/clearance-hepatocyte-az":
             score = max(0.0, metric_map["spearmanr"])

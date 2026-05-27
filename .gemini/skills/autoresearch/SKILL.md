@@ -20,7 +20,7 @@ To set up a new experiment, work with the user to:
 3. **Get the data**: ask the user for the location of the pre-split training and validation data from the `split.py` script
 4. **Read the in-scope files**: The repo is small. Read these files for full context:
    - `README.md` and `GEMINI.md` — repository context.
-   - `pretraining/` - the files you modify.
+   - `pretraining/train.py` - the file you modify.
    Model architecture, optimizer, training loop, etc. are all defined in here.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
@@ -34,32 +34,13 @@ This script requires 2 inputs: the pre-split training and validation data (you s
 
 **What you CAN do:**
 
- - Modify model architecture by changing `pretraining/train.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/config.py`.
- Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+ - Modify model architecture model architecture, optimizer, hyperparameters, training loop, batch size, model size, by changing `pretraining/train.py`.
+ Everything is fair game here, but the code must run without crashing.
 
 > **NOTE**
 > You are optimizing the architecture on a subset of the available training data - the true scale is about 50x larger, so some parameters like batch size may not be as pertinent.
 
 **What you CANNOT do:**
-
- - Modify the evaluation code (`evaluate.py`) **EXCEPT** to make it compatible with the model loading logic, e.g. aggregation function, according to your changes:
-
-```python
-        #########################################
-        # MODEL LOADING LOGIC - you can modify this as needed to be compatible with your model changes, but the evaluation logic should remain the same
-        #########################################
-        featurizer = CuikmolmakerMolGraphFeaturizer(FEATURIZER)
-        _mp = torch.load(mp_path, weights_only=True)
-        if MP_TYPE == "UNTIED":
-            mp = MultiweightMessagePassing(**_mp["hyper_params"])
-        else:
-            mp = BondMessagePassing(**_mp["hyper_params"])
-        mp.load_state_dict(_mp["state_dict"])
-        agg = MeanAggregation()
-        #########################################
-        # END OF MODEL LOADING LOGIC
-        #########################################
-```
 
  - Modify the utility code in `now.py` and `split.py`.
  These are not related to the model or training, and should be left alone.
@@ -67,6 +48,7 @@ This script requires 2 inputs: the pre-split training and validation data (you s
 
 **The goal is simple: get the best evaluation performance.** Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size.
 The only constraint is that the code runs without crashing.
+You can and should implement new classes based on the presented examples to add new functionality, but the code must run without crashing.
 
 **VRAM** is a soft constraint. Some increase is acceptable for meaningful performance gains, but it should not blow up dramatically.
 Arbitrarily large increases may cause the run to crash.
@@ -78,56 +60,35 @@ When evaluating whether to keep a change, weigh the complexity cost against the 
 A 0.001 improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 improvement from deleting code? Definitely keep.
 An improvement of ~0 but much simpler code? Keep.
 
-**Exploration diversity**: Don't just tweak hyperparameters given in `config.py`.
-Edit the training routine and model architecture in ways not reflected in the `config.py` file - anything to improve the model.
+**Exploration diversity**: Don't just tweak hyperparameters like learning rate and hidden size.
+Edit the training routine and model architecture in substantive ways.
+Try adding new components, removing components, changing the way the model works in more fundamental ways.
+Try things that are radically different from the baseline, not just small tweaks.
+The goal is to explore the space of architectures and training methods as broadly as possible to find the best one, so you should be trying a wide variety of things, not just small tweaks to the same architecture.
 
 **The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
 
 ## Experiment Commands and Output Format
 
-All of these commands should be run from the `pretraining` directory within this repository.
-Many will redirect all output to `train_output.log` (or similar) which you can read after the run finishes.
-Note that each of these commands can take a *long time*.
-You should run these in the foreground and wait for the output - DO NOT send them to background, just wait patiently for them to exit and then check status, read output files, etc.
+This should be run from the `pretraining` directory within this repository.
+It will redirect all output to `train_output.log` which you can read after the run finishes.
+Note that each of this command can take a *long time*.
+You should run it in the foreground and wait for the output - DO NOT send them to background, just wait patiently for them to exit and then check status, read output files, etc.
 
-Your first step in each experiment, running the training script, should look like this:
+To run the experiment run the training script, which should look like this:
 
 ```bash
 conda run --no-capture-output -n httyc python train.py /path/to/data_split chemeleon2 &> train_output.log
 ```
 
-The last two lines of the file (read them with `tail`) tell you where to find the best model checkpoint (the one you will use for evaluation) and what the validation performance was for that checkpoint.
+The last line of the file (read it with `tail`) tells you what the validation performance was for that training run.
 Example:
 
 ```bash
-Best model validation metrics: [{'val/mse': 0.2836931347846985, 'val/mae': 0.26995477080345154, 'val/r2': 0.30225974321365356, 'val/rmse': 0.5326285362243652, 'val_loss': 0.3268914520740509}]
-Best model file: /home/jwburns/how-to-train-your-chemeleon/pretraining/chemeleon2/2026-05-18_18-01-04/checkpoints/epoch=0-step=182.ckpt
+Best model validation mse: 0.28369
 ```
 
-You should then run the `extract_mp.py` file to retrieve the message passing weights (the actual foundation model).
-This script will also print the filepath to the new weights.
-Example:
-
-```bash
-$conda run --no-capture-output -n httyc python extract_mp.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750.ckpt 
-
-output will be written to '/home/jwburns/how-to-train-your-chemeleon/pretraining/chemeleon2/2026-05-15_15-20-51/checkpoints/epoch=0-step=750_mp.pt'
-```
-
-Finally, use this command (notice the different conda environment and the `CUDA_VISIBLE_DEVICES=3` prefix) to run the evaluation script on the extracted message passing weights.
-
-```bash
-$ CUDA_VISIBLE_DEVICES=3 conda run --no-capture-output -n polaris python evaluate.py chemeleon2/2026-05-15_15-20-51/checkpoints/epoch\=0-step\=750_mp.pt &> eval_output.log
-```
-
-The evaluation script writes a file called `results.txt` which contains the evaluation metrics for this experimentin particular:
-
-```
-SUMMARY_METRIC: 0.997900
-```
-
-**Higher is better for this metric**.
-You should extract this summary metric and record it in the `results.tsv` file along with the pretraining MSE and a short description of what you changed in this experiment.
+You should extract this and record it in the `results.tsv` file along with a short description of what you changed in this experiment.
 
 ## Logging results
 
@@ -136,22 +97,21 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 The TSV has a header row and these columns:
 
 ```
-commit	performance  pretraining mse	status	description
+commit	validation mse	status	description
 ```
 
 1. git commit hash (short, 7 chars)
-2. evaluation performance achieved (e.g. 0.750) — use a blank for crashes
-3. pretraining MSE (the `val/mse` metric from the training log) for informational purposes ONLY — use a blank for crashes
-4. status: `keep`, `discard`, or `crash`
-5. short text description of what this experiment tried
+2. validation MSE (the `val/mse` metric from the training log) — use a blank for crashes
+3. status: `keep`, `discard`, or `crash`
+4. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	performance  pretraining mse	status	description
-a1b2c3d	0.997900	0.283693	keep	baseline
-b2c3d4e	0.993200	0.326891	keep	increase LR to 0.04
-c3d4e5f	0.990000	0.345551	discard	switch to GeLU activation
+commit	validation mse	status	description
+a1b2c3d	0.283693	keep	baseline
+b2c3d4e	0.226891	keep	increase LR to 0.04
+c3d4e5f	0.345551	discard	switch to GeLU activation
 d4e5f6g			crash	double model width (OOM)
 ```
 
@@ -162,15 +122,14 @@ The experiment runs on a dedicated branch.
 LOOP FOREVER:
 
 1. Look at the git state: the current branch/commit we're on
-2. Tune `pretraining/config.py`, `pretraining/multiweight_message_passing.py`, `pretraining/random_dropout_mse.py`, and `pretraining/train.py` with an experimental idea by directly hacking the code.
+2. Tune `pretraining/train.py` with an experimental idea by directly hacking the code.
 3. git commit
-4. Run the experiment by following the instructions in the [Experiment Commands and Output Format](#experiment-commands-and-output-format) section above, making sure to use the redirect output to a log file so that it doesn't flood your context.
-5. Read out the results from `results.txt` which will be written by `evaluate.py` on each run.
-6. If the run crashed at any stage, read the Python stack trace and attempt a fix.
+4. Run the experiment by following the instructions in the [Experiment Commands and Output Format](#experiment-commands-and-output-format) to record the results.
+5. If the run crashed at any stage, read the Python stack trace and attempt a fix.
 If you can't get things to work after more than two attempts, give up.
-7. Record the results in the tsv (NOTE: commit the results.tsv file to git can track it)
-8. If performance improved, you "advance" the branch, keeping the git commit
-9. If performance is equal or worse, you should revert the commit to preserve the history of the experiment but get back to the better code.
+6. Record the results in the tsv (NOTE: commit the results.tsv file to git can track it)
+7. If performance improved, you "advance" the branch, keeping the git commit
+8. If performance is equal or worse, you should revert the commit to preserve the history of the experiment but get back to the better code.
 
 The idea is that you are a completely autonomous researcher trying things out.
 If they work, keep.

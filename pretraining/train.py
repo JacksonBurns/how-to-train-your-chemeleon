@@ -285,7 +285,7 @@ if __name__ == "__main__":
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
-            hidden_dim=2_048,
+            hidden_dim=1_024,
             n_layers=1,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),

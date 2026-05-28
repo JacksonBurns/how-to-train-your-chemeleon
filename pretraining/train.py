@@ -276,6 +276,7 @@ if __name__ == "__main__":
             d_e=featurizer.bond_fdim,
             d_h=2_048,
             depth=4,
+            bias=True,
             activation=torch.nn.GELU(),
     )
 

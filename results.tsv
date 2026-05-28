@@ -1,2 +1,3 @@
 commit	validation mse	status	description
 6abd389	0.24039	keep	baseline
+175199f	0.23724	keep	GELU activation

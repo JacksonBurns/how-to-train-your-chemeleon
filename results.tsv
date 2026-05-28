@@ -10,3 +10,4 @@ a964552	0.23594	discard	Increase RegressionFFN n_layers to 2
 56f0571	0.23396	keep	Increase max_epochs to 20
 decd965	0.23396	keep	Increase MultiweightMessagePassing depth to 5
 787fdf6	0.23396	keep	Increase RegressionFFN hidden_dim to 2048
+e830bde	0.23396	keep	Increase MultiweightMessagePassing d_h to 3072

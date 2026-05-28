@@ -292,7 +292,7 @@ if __name__ == "__main__":
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
-        max_lr=0.003,
+        max_lr=0.001,
         final_lr=0.0001,
         warmup_epochs=2,
     )

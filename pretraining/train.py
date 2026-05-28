@@ -29,7 +29,7 @@ from config import CHUNKS_PER_BATCH
 
 
 DROPOUT_FRACTION = 0.50
-FEATURIZER = "RIGR"  # one of: "V2", "RIGR"
+FEATURIZER = "V2"  # one of: "V2", "RIGR"
 
 
 @LossFunctionRegistry.register("rdmse")

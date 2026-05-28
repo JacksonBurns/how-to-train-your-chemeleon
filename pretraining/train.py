@@ -11,7 +11,7 @@ from chemprop.conf import DEFAULT_ATOM_FDIM, DEFAULT_BOND_FDIM, DEFAULT_HIDDEN_D
 from chemprop.data import BatchMolGraph
 from chemprop.featurizers import BatchCuikMolGraph, CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
-from chemprop.nn import Aggregation, AggregationRegistry, RegressionFFN, metrics, AddAggregation
+from chemprop.nn import Aggregation, AggregationRegistry, RegressionFFN, metrics
 from chemprop.nn.message_passing.base import _BondMessagePassingMixin, _MessagePassingBase
 from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 from lightning.pytorch import Trainer
@@ -277,7 +277,7 @@ if __name__ == "__main__":
 
     model = MPNN(
         mp,
-        AddAggregation(),
+        MeanAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=3_072,

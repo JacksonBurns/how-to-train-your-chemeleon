@@ -22,7 +22,7 @@ To set up a new experiment, work with the user to:
    - `README.md` and `GEMINI.md` — repository context.
    - `pretraining/train.py` - the file you modify.
    Model architecture, optimizer, training loop, etc. are all defined in here.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
+5. **Initialize log.txt**: Create `log.txt`
 6. **Confirm and go**: Confirm setup looks good.
 
 Once you get confirmation, kick off the experimentation.
@@ -66,55 +66,45 @@ Try adding new components, removing components, changing the way the model works
 Try things that are radically different from the baseline, not just small tweaks.
 The goal is to explore the space of architectures and training methods as broadly as possible to find the best one, so you should be trying a wide variety of things, not just small tweaks to the same architecture.
 
+**Hypothesis generation**: You should be generating hypotheses for why a change might improve performance, and writing those down in `log.txt` along with the results.
+For example, you might write "I think adding a second attention head will help because it allows the model to attend to multiple aspects of the input at once, which is important for this task."
+When evaluating whether to keep a change, you should be weighing the observed improvement against your original hypothesis and whether the results support it.
+Over time, you should be developing an intuition for what kinds of changes are likely to lead to improvements, and you should be using that intuition to guide your exploration.
+At each iteration, consider multiple different hypotheses for why a change might improve performance, and try to test those hypotheses with your experiments.
+
 **The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
 
 ## Experiment Commands and Output Format
 
-This should be run from the `pretraining` directory within this repository.
-It will redirect all output to `train_output.log` which you can read after the run finishes.
+This will redirect all output to `train_output.log` which you can read after the run finishes, if needed.
 Note that each of this command can take a *long time*.
 You should run it in the foreground and wait for the output - DO NOT send them to background, just wait patiently for them to exit and then check status, read output files, etc.
 
 To run the experiment run the training script, which should look like this:
 
 ```bash
-conda run --no-capture-output -n httyc python train.py /path/to/data_split chemeleon2 &> train_output.log
+conda run --no-capture-output -n httyc python pretraining/train.py /path/to/data_split chemeleon2 &> train_output.log
 ```
 
 **CRITICAL**: Run this command in the foreground and retain the `&>` redirection to capture all output to the log file - do not run it in the background or flood your context window with training output.
 
-The last line of the file (read it with `tail`) tells you what the validation performance was for that training run.
-Example:
+After this command finishes, it will write the best validation MSE to the log file (`results.csv`) in a line that looks like this, with the most recent execution at the bottom:
 
-```bash
-Best model validation mse: 0.28369
+```
+run_name,val_mse
+2026-05-28_13-00-05,0.24940
 ```
 
-You should extract this and record it in the `results.tsv` file along with a short description of what you changed in this experiment.
+You should check this file (but not modify it) to judge the performance of the experiment.
+If the experiment crashed, there will be no new line in the `results.csv` file, so you should check the `train_output.log` for error messages and stack traces to understand what went wrong.
 
 ## Logging results
 
-When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
-
-The TSV has a header row and these columns:
-
-```
-commit	validation mse	status	description
-```
-
-1. git commit hash (short, 7 chars)
-2. validation MSE (the `val/mse` metric from the training log) — use a blank for crashes
-3. status: `keep`, `discard`, or `crash`
-4. short text description of what this experiment tried
-
-Example:
+When an experiment is done, write what you changed to a file called `log.txt` in the root of the repository, along with the validation MSE from `results.csv` and any notes about whether you think it's a good change or not.
+You should, for example, write something like this:
 
 ```
-commit	validation mse	status	description
-a1b2c3d	0.283693	keep	baseline
-b2c3d4e	0.226891	keep	increase LR to 0.04
-c3d4e5f	0.345551	discard	switch to GeLU activation
-d4e5f6g			crash	double model width (OOM)
+2026-05-28_13-00-05: Baseline run. Validation MSE: 0.24940. This is our baseline to beat.
 ```
 
 ## The experiment loop
@@ -129,7 +119,7 @@ LOOP FOREVER:
 4. Run the experiment by following the instructions in the [Experiment Commands and Output Format](#experiment-commands-and-output-format) to record the results.
 5. If the run crashed at any stage, read the Python stack trace and attempt a fix.
 If you can't get things to work after more than two attempts, give up.
-6. Record the results in the tsv (NOTE: commit the results.tsv file to git can track it)
+6. Record the results in `log.txt` along with your thoughts on the change and whether you think it's a good idea or not.
 7. If performance improved, you "advance" the branch, keeping the git commit
 8. If performance is equal or worse, you should revert the commit to preserve the history of the experiment but get back to the better code.
 

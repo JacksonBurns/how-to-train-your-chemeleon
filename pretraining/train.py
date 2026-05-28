@@ -223,6 +223,10 @@ if __name__ == "__main__":
     output_dir.mkdir(exist_ok=True)
     output_dir = output_dir / NOW
     output_dir.mkdir(exist_ok=True)
+    
+    if not Path("results.csv").exists():
+        with open("results.csv", "w") as f:
+            f.write("run_name,val_mse\n")
 
     training_store = input_dir / "train_rescaled.zarr"
     validation_store = input_dir / "val_rescaled.zarr"
@@ -337,3 +341,7 @@ if __name__ == "__main__":
     val_metrics = trainer.validate(model, val_dataloader, verbose=False)
     rank_zero_info(f"Best model file: {ckpt_path}")
     rank_zero_info(f"Best model validation mse: {val_metrics[0]['val/mse']:.5f}")
+    # write on rank zero only
+    if trainer.global_rank == 0:
+        with open("results.csv", "a") as f:
+            f.write(f"{output_dir.name},{val_metrics[0]['val/mse']:.5f}\n")

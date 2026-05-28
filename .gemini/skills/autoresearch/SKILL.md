@@ -81,6 +81,8 @@ To run the experiment run the training script, which should look like this:
 conda run --no-capture-output -n httyc python train.py /path/to/data_split chemeleon2 &> train_output.log
 ```
 
+**CRITICAL**: Run this command in the foreground and retain the `&>` redirection to capture all output to the log file - do not run it in the background or flood your context window with training output.
+
 The last line of the file (read it with `tail`) tells you what the validation performance was for that training run.
 Example:
 

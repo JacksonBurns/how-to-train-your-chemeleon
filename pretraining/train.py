@@ -289,7 +289,6 @@ if __name__ == "__main__":
             n_layers=1,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
-            dropout=0.1,
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,

@@ -272,7 +272,7 @@ if __name__ == "__main__":
             d_e=featurizer.bond_fdim,
             d_h=2_048,
             depth=5,
-            activation=torch.nn.GELU(),
+            activation=torch.nn.LeakyReLU(),
     )
 
     model = MPNN(

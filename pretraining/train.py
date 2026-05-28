@@ -28,7 +28,7 @@ from now import NOW
 from config import CHUNKS_PER_BATCH
 
 
-DROPOUT_FRACTION = 0.00
+DROPOUT_FRACTION = 0.30
 FEATURIZER = "RIGR"  # one of: "V2", "RIGR"
 
 

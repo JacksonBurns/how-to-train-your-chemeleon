@@ -272,7 +272,7 @@ if __name__ == "__main__":
             d_e=featurizer.bond_fdim,
             d_h=2_048,
             depth=4,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
     )
 
     model = MPNN(
@@ -283,7 +283,7 @@ if __name__ == "__main__":
             input_dim=mp.output_dim,
             hidden_dim=1_024,
             n_layers=1,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],

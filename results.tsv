@@ -1,0 +1,19 @@
+commit	validation mse	status	description
+6abd389	0.24039	keep	baseline
+175199f	0.23724	keep	GELU activation
+bfa8bbb		crash	Increase MultiweightMessagePassing d_h to 4096 and depth to 6, and RegressionFFN hidden_dim to 4096 (OOM)
+7a181c3	0.23432	keep	Decrease DROPOUT_FRACTION to 0.10
+93a9352	0.23396	keep	Increase max_lr to 0.002 and final_lr to 0.0002
+a964552	0.23594	discard	Increase RegressionFFN n_layers to 2
+27b80c6	0.24910	discard	Change FEATURIZER to V2
+4d9c1b1	0.23396	keep	Increase EarlyStopping patience to 3
+56f0571	0.23396	keep	Increase max_epochs to 20
+decd965	0.23396	keep	Increase MultiweightMessagePassing depth to 5
+787fdf6	0.23396	keep	Increase RegressionFFN hidden_dim to 2048
+e830bde	0.23396	keep	Increase MultiweightMessagePassing d_h to 3072
+9afd70e	0.23396	keep	Increase warmup_epochs to 4
+fb9375a		crash	Change MPNN Aggregation to AddAggregation (ImportError)
+7f31c37	0.23396	keep	Increase RegressionFFN hidden_dim to 4096, reset MultiweightMessagePassing d_h to 2048
+40b7623	0.23396	keep	Add Dropout(p=0.10) to RegressionFFN
+59f4525	0.23396	keep	Change LayerNorm to BatchNorm1d in MultiweightMessagePassing
+1d2da10	0.23396	keep	Change MultiweightMessagePassing activation to LeakyReLU

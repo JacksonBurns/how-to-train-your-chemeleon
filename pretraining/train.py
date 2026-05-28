@@ -282,7 +282,7 @@ if __name__ == "__main__":
             n_tasks=n_features,
             input_dim=mp.output_dim,
             hidden_dim=1_024,
-            n_layers=1,
+            n_layers=2,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),

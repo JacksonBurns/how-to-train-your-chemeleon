@@ -270,7 +270,7 @@ if __name__ == "__main__":
     mp = MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
-            d_h=2_048,
+            d_h=3_072,
             depth=5,
             activation=torch.nn.GELU(),
     )
@@ -280,7 +280,7 @@ if __name__ == "__main__":
         MeanAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
-            input_dim=mp.output_dim,
+            input_dim=3_072,
             hidden_dim=2_048,
             n_layers=1,
             activation=torch.nn.GELU(),

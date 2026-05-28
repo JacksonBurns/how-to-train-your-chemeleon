@@ -17,7 +17,6 @@ from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
-from lightning.pytorch.callbacks import StochasticWeightAveraging
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
@@ -317,7 +316,6 @@ if __name__ == "__main__":
             mode="min",
             dirpath=output_dir / "checkpoints",
         ),
-        StochasticWeightAveraging(swa_lrs=1e-4),
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(

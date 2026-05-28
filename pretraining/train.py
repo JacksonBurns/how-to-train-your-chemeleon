@@ -17,7 +17,8 @@ from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
-from lightning.pytorch.loggers import TensorBoardLogger
+import mlflow
+from lightning.pytorch.loggers import MLFlowLogger
 from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
 from torch import Tensor, nn
@@ -25,7 +26,7 @@ from torch.utils.data import DataLoader
 
 from dataset import ChempropChunkwiseZarrDataset
 from now import NOW
-from config import CHUNKS_PER_BATCH
+from config import CHUNKS_PER_BATCH, WINSORIZATION_FACTOR
 
 
 DROPOUT_FRACTION = 0.30
@@ -298,10 +299,33 @@ if __name__ == "__main__":
     )
     rank_zero_info(model)
 
-    tensorboard_logger = TensorBoardLogger(
-        output_dir,
-        name="tensorboard_logs",
-        default_hp_metric=False,
+    mlflow.set_tracking_uri(f"file://{output_dir / 'mlflow'}")
+
+    logger = MLFlowLogger(
+        experiment_name="chemeleon",
+        run_name=NOW,
+        tracking_uri=f"file://{output_dir / 'mlflow'}",
+    )
+
+    mlflow.log_params(
+        {
+            "EPOCHS": 10,
+            "FEATURIZER": FEATURIZER,
+            "INITIAL_LEARNING_RATE": 0.0001,
+            "MAXIMUM_LEARNING_RATE": 0.001,
+            "FINAL_LEARNING_RATE": 0.0001,
+            "WARMUP_EPOCHS": 2,
+            "PATIENCE": 1,
+            "MP_HIDDEN_SIZE": 2_048,
+            "MP_DEPTH": 4,
+            "MP_ACTIVATION": "ReLU",
+            "FNN_HIDDEN_SIZE": 1_024,
+            "FNN_HIDDEN_LAYERS": 1,
+            "FNN_ACTIVATION": "ReLU",
+            "CHUNKS_PER_BATCH": CHUNKS_PER_BATCH,
+            "DROPOUT_FRACTION": DROPOUT_FRACTION,
+            "WINSORIZATION_FACTOR": WINSORIZATION_FACTOR,
+        }
     )
     callbacks = [
         EarlyStopping(
@@ -320,7 +344,7 @@ if __name__ == "__main__":
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
         max_epochs=10,
-        logger=tensorboard_logger,
+        logger=logger,
         log_every_n_steps=1,
         enable_checkpointing=True,
         check_val_every_n_epoch=1,

@@ -294,7 +294,7 @@ if __name__ == "__main__":
         init_lr=0.0001,
         max_lr=0.001,
         final_lr=0.0001,
-        warmup_epochs=2,
+        warmup_epochs=4,
     )
     rank_zero_info(model)
 
@@ -319,7 +319,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=10,
+        max_epochs=20,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

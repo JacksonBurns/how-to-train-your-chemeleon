@@ -281,7 +281,7 @@ if __name__ == "__main__":
 
     model = MPNN(
         mp,
-        SumAggregation(),
+        MeanAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
@@ -345,4 +345,3 @@ if __name__ == "__main__":
     if trainer.global_rank == 0:
         with open("results.csv", "a") as f:
             f.write(f"{output_dir.name},{val_metrics[0]['val/mse']:.5f}\n")
-l/mse']:.5f}\n")

@@ -288,8 +288,8 @@ if __name__ == "__main__":
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
-        max_lr=0.001,
-        final_lr=0.0001,
+        max_lr=0.002,
+        final_lr=0.0002,
         warmup_epochs=2,
     )
     rank_zero_info(model)

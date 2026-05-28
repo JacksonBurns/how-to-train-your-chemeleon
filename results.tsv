@@ -5,3 +5,4 @@ bfa8bbb		crash	Increase MultiweightMessagePassing d_h to 4096 and depth to 6, an
 7a181c3	0.23432	keep	Decrease DROPOUT_FRACTION to 0.10
 93a9352	0.23396	keep	Increase max_lr to 0.002 and final_lr to 0.0002
 a964552	0.23594	discard	Increase RegressionFFN n_layers to 2
+27b80c6	0.24910	discard	Change FEATURIZER to V2

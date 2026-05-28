@@ -154,7 +154,7 @@ class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
         self.W_h = nn.ModuleList([nn.Linear(d_h, d_h, bias=bias) for _ in range(self.depth - 1)])
 
         # LayerNorms for regularization
-        self.norms = nn.ModuleList([nn.LayerNorm(d_h) for _ in range(self.depth - 1)])
+        self.norms = nn.ModuleList([nn.BatchNorm1d(d_h) for _ in range(self.depth - 1)])
 
     def setup(
         self,

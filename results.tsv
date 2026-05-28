@@ -1,3 +1,4 @@
 commit	validation mse	status	description
 6abd389	0.24039	keep	baseline
 175199f	0.23724	keep	GELU activation
+bfa8bbb		crash	Increase MultiweightMessagePassing d_h to 4096 and depth to 6, and RegressionFFN hidden_dim to 4096 (OOM)

@@ -13,3 +13,4 @@ decd965	0.23396	keep	Increase MultiweightMessagePassing depth to 5
 e830bde	0.23396	keep	Increase MultiweightMessagePassing d_h to 3072
 9afd70e	0.23396	keep	Increase warmup_epochs to 4
 fb9375a		crash	Change MPNN Aggregation to AddAggregation (ImportError)
+7f31c37	0.23396	keep	Increase RegressionFFN hidden_dim to 4096, reset MultiweightMessagePassing d_h to 2048

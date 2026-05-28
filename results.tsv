@@ -15,3 +15,4 @@ e830bde	0.23396	keep	Increase MultiweightMessagePassing d_h to 3072
 fb9375a		crash	Change MPNN Aggregation to AddAggregation (ImportError)
 7f31c37	0.23396	keep	Increase RegressionFFN hidden_dim to 4096, reset MultiweightMessagePassing d_h to 2048
 40b7623	0.23396	keep	Add Dropout(p=0.10) to RegressionFFN
+59f4525	0.23396	keep	Change LayerNorm to BatchNorm1d in MultiweightMessagePassing

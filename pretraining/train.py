@@ -326,6 +326,7 @@ if __name__ == "__main__":
         check_val_every_n_epoch=1,
         callbacks=callbacks,
         val_check_interval=0.5,
+        gradient_clip_val=1.0,
     )
     restart_ckpt = os.environ.get("RESTART_CKPT", None)
     trainer.fit(

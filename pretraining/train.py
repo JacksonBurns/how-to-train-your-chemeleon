@@ -52,13 +52,6 @@ class RandomDropoutMSE(MSE):
         super().update(preds, targets, mask, weights, lt_mask, gt_mask)
 
 
-@LossFunctionRegistry.register("rdhuber")
-@MetricRegistry.register("rdhuber")
-class RandomDropoutHuber(RandomDropoutMSE):
-    def _calc_unreduced_loss(self, preds: torch.Tensor, targets: torch.Tensor, *args) -> torch.Tensor:
-        return torch.nn.functional.huber_loss(preds, targets, reduction="none", delta=1.0)
-
-
 @AggregationRegistry.register("mean")
 class MeanAggregation(Aggregation):
     r"""Average the graph-level representation:
@@ -295,7 +288,7 @@ if __name__ == "__main__":
             hidden_dim=1_024,
             n_layers=1,
             activation=torch.nn.GELU(),
-            criterion=RandomDropoutHuber(),
+            criterion=RandomDropoutMSE(),
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,

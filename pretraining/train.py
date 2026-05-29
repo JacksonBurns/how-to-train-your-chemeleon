@@ -294,7 +294,7 @@ if __name__ == "__main__":
         init_lr=0.0001,
         max_lr=0.001,
         final_lr=0.0001,
-        warmup_epochs=2,
+        warmup_epochs=5,
     )
     rank_zero_info(model)
 

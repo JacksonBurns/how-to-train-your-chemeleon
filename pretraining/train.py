@@ -136,25 +136,15 @@ class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
 
 class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
     r"""A variant of BondMessagePassing where the hidden weight matrix (W_h)
-    is untied across message passing steps (depth).
-
-    Instead of reapplying the same matrix, a distinct W_h_i is learned for each iteration.
+    is tied across message passing steps (depth).
     """
 
     def __init__(self, *args, **kwargs):
-        # 1. Run the base initialization, which will temporarily create a single W_h
+        # 1. Run the base initialization, which will create a single W_h
         super().__init__(*args, **kwargs)
 
-        # 2. Extract dimensions and bias from the temporarily created matrix
-        d_h = self.W_h.in_features
-        bias = self.W_h.bias is not None
-
-        # 3. Overwrite W_h with a ModuleList of untied matrices.
-        # The message passing loop runs (depth - 1) times, so we need (depth - 1) matrices.
-        self.W_h = nn.ModuleList([nn.Linear(d_h, d_h, bias=bias) for _ in range(self.depth - 1)])
-
-        # LayerNorms for regularization
-        self.norms = nn.ModuleList([nn.LayerNorm(d_h) for _ in range(self.depth - 1)])
+        # LayerNorm for regularization
+        self.norm = nn.LayerNorm(self.W_h.in_features)
 
     def setup(
         self,
@@ -165,7 +155,6 @@ class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
         bias: bool = False,
     ):
         # Standard setup required by the base class.
-        # The single W_h returned here is immediately overwritten by our __init__ above.
         W_i = nn.Linear(d_v + d_e, d_h, bias)
         W_h = nn.Linear(d_h, d_h, bias)
         W_o = nn.Linear(d_v + d_h, d_h)
@@ -174,10 +163,9 @@ class MultiweightMessagePassing(_BondMessagePassingMixin, _MessagePassingBase):
         return W_i, W_h, W_o, W_d
 
     def update(self, M_t: Tensor, H_0: Tensor, step: int) -> Tensor:
-        """Calculate the updated hidden state using the step-specific weight matrix"""
-        # Select the specific layernorm/weight matrix for this depth iteration
-        M_norm = self.norms[step](M_t)
-        H_t = self.W_h[step](M_norm)
+        """Calculate the updated hidden state using the tied weight matrix"""
+        M_norm = self.norm(M_t)
+        H_t = self.W_h(M_norm)
         H_t = self.tau(H_0 + H_t)
         H_t = self.dropout(H_t)
 

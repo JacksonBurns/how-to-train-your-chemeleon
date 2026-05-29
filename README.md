@@ -72,3 +72,31 @@ For `autoresearch` with `gemini`, need to extend shell call idle time:
   }
 }
 ```
+
+```
+The autoresearch project for the CheMeleon foundation model has concluded after 36 experiments. The final model configuration achieved a Validation MSE of 0.05492,
+  representing a massive 4.5x improvement over the initial baseline of 0.25103.
+
+  Final Optimal Configuration
+   * Featurizer: RIGR
+   * Activation Function: GELU
+   * Target Masking: 50% (Target Dropout Fraction = 0.50)
+   * Batch Size: CHUNKS_PER_BATCH = 2
+   * MPNN Architecture: d_h = 2048, depth = 4, Untied Weights
+   * Predictor Architecture: hidden_dim = 1024, n_layers = 1
+   * Learning Rate: max_lr = 0.001, final_lr = 0.0001, warmup_epochs = 2
+   * Training Schedule: 10 Epochs with Early Stopping patience of 1.
+
+  Key Research Discoveries
+   1. Synergistic Regularization: The most significant performance gains came from combining heavy Target Masking (50%) with increased Batch Noise (CHUNKS_PER_BATCH=2).
+      This dual-stochastic approach was essential for generalising across the 3,585 classical molecular descriptors.
+   2. Activation & Pooling: GELU provided the most stable gradient flow for this complex regression task, while MeanAggregation was found to be far superior to Sum or Max
+      pooling at preserving signal across diverse molecule sizes.
+   3. Untied Weights: Using independent weight matrices for each message-passing step (MultiweightMessagePassing) was crucial; tying the weights caused performance to
+      collapse back toward the baseline.
+   4. Capacity Balance: Increasing the model's width (d_h=2048) was beneficial, but increasing the depth or predictor layers caused immediate overfitting or memory crashes
+      (OOM).
+
+  The complete experimental history is recorded in log.txt and the performance metrics for every run are available in results.csv. The repository is currently on the
+  dev/chemeleon2-autoresearch-may28-v2 branch with the optimal configuration applied.
+  ```

@@ -1,0 +1,35 @@
+2026-05-28_13-30-29: Baseline run. Validation MSE: 0.25103. This is our baseline to beat.2026-05-28_13-41-51: Experiment 1 (Predictor Capacity). Validation MSE: 0.26263. Increased predictor capacity. Worse than baseline. Discarding.
+2026-05-28_13-48-00: Experiment 2 (MPNN depth=6). Crashed with OOM. Reverted.
+2026-05-28_13-54-06: Experiment 3 (GELU Activation). Validation MSE: 0.23536. Better than baseline (0.25103). Kept.
+2026-05-28_14-01-11: Experiment 4 (SumAggregation). Validation MSE: 0.31518. Much worse than GELU baseline. Reverted.
+2026-05-28_14-05-37: Experiment 5 (Target Dropout 0.0). Validation MSE: 0.26240. Worse than GELU baseline. Reverted.
+2026-05-28_14-13-27: Experiment 6 (Target Dropout 0.5). Validation MSE: 0.07943. Incredible improvement over 0.23536. Kept.
+2026-05-28_14-33-18: Experiment 7 (Target Dropout 0.7). Validation MSE: 0.24455. Worse than 0.5 Dropout. Reverted.
+2026-05-28_14-39-56: Experiment 8 (Increase max_lr to 0.003). Validation MSE: 0.28992. Worse than 0.001. Reverted.
+2026-05-28_14-43-56: Experiment 9 (Predictor n_layers=2). Validation MSE: 0.27162. Worse than 0.07943. Reverted.
+2026-05-28_14-48-05: Experiment 10 (MPNN d_h=1024). Validation MSE: 0.09219. Worse than 0.07943. Reverted.
+2026-05-28_14-55-58: Experiment 11 (MPNN depth=5). Crashed with OOM. Reverted.
+2026-05-28_14-58-37: Experiment 12 (Predictor dropout=0.1). Validation MSE: 0.23260. Worse than 0.07943. Reverted.
+2026-05-28_15-04-27: Experiment 13 (Extended Training). Validation MSE: 0.17701. Early stopped too soon. Reverted.
+2026-05-28_15-12-14: Experiment 14 (Patience=3). Validation MSE: 0.08408. Close but worse than 0.07943. Reverted.
+2026-05-28_15-32-23: Experiment 15 (V2 Featurizer). Validation MSE: 0.27373. Worse than RIGR. Reverted.
+2026-05-28_15-36-55: Experiment 16 (Target Dropout 0.4). Validation MSE: 0.25142. Much worse than 0.5 Dropout. Reverted.
+2026-05-28_15-41-48: Experiment 17 (Warmup epochs 1). Validation MSE: 0.11545. Worse than 0.07943. Reverted.
+2026-05-28_15-52-18: Experiment 18 (final_lr 0.00001). Validation MSE: 0.10192. Worse than 0.07943. Reverted.
+2026-05-28_16-12-17: Experiment 19 (MPNN bias=True). Validation MSE: 0.28513. Worse than 0.07943. Reverted.
+2026-05-28_16-20-41: Experiment 20 (FFN hidden_dim=2048). Validation MSE: 0.24000. Worse than 0.07943. Reverted.
+2026-05-28_16-26-01: Experiment 21 (MPNN dropout=0.1). Validation MSE: 0.26127. Worse than 0.07943. Reverted.
+2026-05-28_16-29-28: Experiment 22 (SiLU Activation). Validation MSE: 0.24930. Worse than GELU. Reverted.
+2026-05-28_16-34-45: Experiment 23 (Target Dropout 0.45). Validation MSE: 0.21586. Worse than 0.5 Dropout. Reverted.
+2026-05-28_16-41-02: Experiment 24 (CHUNKS_PER_BATCH=8). Crashed with OOM. Reverted.
+2026-05-28_16-43-12: Experiment 25 (CHUNKS_PER_BATCH=2). Validation MSE: 0.05492. Massive breakthrough over 0.07943. Kept.
+2026-05-28_16-55-40: Experiment 26 (CHUNKS_PER_BATCH=1). Validation MSE: 0.06285. Worse than 0.05492. Reverted.
+2026-05-28_17-07-28: Experiment 27 (Target Dropout 0.4 with Batch 2). Validation MSE: 0.05501. Worse than 0.05492. Reverted.
+2026-05-28_17-27-58: Experiment 28 (CHUNKS_PER_BATCH=3). Validation MSE: 0.20906. Worse than 0.05492. Reverted.
+2026-05-28_17-33-01: Experiment 29 (Gradient Clipping). Validation MSE: 0.25236. Worse than 0.05492. Reverted.
+2026-05-28_17-36-17: Experiment 30 (SWA). Validation MSE: 0.10928. Worse than 0.05492. Reverted.
+2026-05-28_17-43-32: Experiment 31 (LeakyReLU). Validation MSE: 0.21178. Worse than 0.05492. Reverted.
+2026-05-28_21-56-57: Experiment 32 (MaxAggregation). Validation MSE: 0.11508. Worse than MeanAggregation. Reverted.
+2026-05-28_22-06-22: Experiment 33 (max_lr=0.0005). Validation MSE: 0.14084. Worse than 0.001. Reverted.
+2026-05-28_22-23-49: Experiment 34 (max_lr=0.002). Validation MSE: 0.11459. Worse than 0.001. Reverted.
+2026-05-28_22-37-18: Experiment 35 (Tied Weights). Validation MSE: 0.28106. Worse than 0.05492. Reverted.

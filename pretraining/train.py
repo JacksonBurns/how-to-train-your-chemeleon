@@ -67,6 +67,15 @@ class MeanAggregation(Aggregation):
             self.dim, index_torch, H, reduce="mean", include_self=False
         )
 
+@AggregationRegistry.register("max")
+class MaxAggregation(Aggregation):
+    def forward(self, H: Tensor, batch: Tensor) -> Tensor:
+        index_torch = batch.unsqueeze(1).repeat(1, H.shape[1])
+        dim_size = batch.max().int() + 1
+        return torch.zeros(dim_size, H.shape[1], dtype=H.dtype, device=H.device).scatter_reduce_(
+            self.dim, index_torch, H, reduce="amax", include_self=False
+        )
+
 
 class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
     def __call__(
@@ -281,7 +290,7 @@ if __name__ == "__main__":
 
     model = MPNN(
         mp,
-        MeanAggregation(),
+        MaxAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,

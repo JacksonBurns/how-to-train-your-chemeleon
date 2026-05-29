@@ -37,3 +37,4 @@
 2026-05-29_09-21-14: Experiment 41 (20 epochs, patience 5). Validation MSE: 0.04200. Significant improvement over 0.05492. Kept.
 2026-05-29_10-00-11: Experiment 42 (MPNN width=2560, 20 epochs). Validation MSE: 0.03591. Another significant improvement. Kept.
 2026-05-29_12-37-55: Experiment 45 (warmup=5). Validation MSE: 0.04049. Worse than 0.03591. Reverted.
+2026-05-29_13-46-16: Experiment 46 (MPNN width=2688, 20 epochs). Validation MSE: 0.03531. New best record! Kept.

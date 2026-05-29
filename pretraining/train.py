@@ -274,7 +274,7 @@ if __name__ == "__main__":
     mp = MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
-            d_h=2_688,
+            d_h=2_752,
             depth=4,
             activation=torch.nn.GELU(),
     )

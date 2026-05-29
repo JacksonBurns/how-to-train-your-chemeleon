@@ -32,4 +32,4 @@
 2026-05-28_21-56-57: Experiment 32 (MaxAggregation). Validation MSE: 0.11508. Worse than MeanAggregation. Reverted.
 2026-05-28_22-06-22: Experiment 33 (max_lr=0.0005). Validation MSE: 0.14084. Worse than 0.001. Reverted.
 2026-05-28_22-23-49: Experiment 34 (max_lr=0.002). Validation MSE: 0.11459. Worse than 0.001. Reverted.
-2026-05-28_22-37-18: Experiment 35 (Tied Weights). Validation MSE: 0.28106. Worse than 0.05492. Reverted.
+2026-05-28_22-37-18: Experiment 35 (Tied Weights). Validation MSE: 0.28106. Worse than 0.05492. Reverted.2026-05-28_23-00-00: Experiment 37 (MPNN d_h=3048). Crashed with OOM. Reverted.

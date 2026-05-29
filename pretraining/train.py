@@ -281,7 +281,7 @@ if __name__ == "__main__":
 
     model = MPNN(
         mp,
-        MeanAggregation(),
+        AggregationRegistry.get("norm")(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,

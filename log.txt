@@ -32,9 +32,11 @@
 2026-05-28_21-56-57: Experiment 32 (MaxAggregation). Validation MSE: 0.11508. Worse than MeanAggregation. Reverted.
 2026-05-28_22-06-22: Experiment 33 (max_lr=0.0005). Validation MSE: 0.14084. Worse than 0.001. Reverted.
 2026-05-28_22-23-49: Experiment 34 (max_lr=0.002). Validation MSE: 0.11459. Worse than 0.001. Reverted.
-2026-05-28_22-37-18: Experiment 35 (Tied Weights). Validation MSE: 0.28106. Worse than 0.05492. Reverted.2026-05-29_09-08-10: Experiment 38 (Predictor hidden_dim=1536). Validation MSE: 0.25502. Worse than 0.05492. Reverted.
+2026-05-28_22-37-18: Experiment 35 (Tied Weights). Validation MSE: 0.28106. Worse than 0.05492. Reverted.
+2026-05-29_09-08-10: Experiment 38 (Predictor hidden_dim=1536). Validation MSE: 0.25502. Worse than 0.05492. Reverted.
 2026-05-29_09-16-38: Experiment 40 (Target Dropout 0.49). Validation MSE: 0.17082. Worse than 0.50. Reverted.
 2026-05-29_09-21-14: Experiment 41 (20 epochs, patience 5). Validation MSE: 0.04200. Significant improvement over 0.05492. Kept.
 2026-05-29_10-00-11: Experiment 42 (MPNN width=2560, 20 epochs). Validation MSE: 0.03591. Another significant improvement. Kept.
 2026-05-29_12-37-55: Experiment 45 (warmup=5). Validation MSE: 0.04049. Worse than 0.03591. Reverted.
 2026-05-29_13-46-16: Experiment 46 (MPNN width=2688, 20 epochs). Validation MSE: 0.03531. New best record! Kept.
+2026-05-29_18-21-54: Experiment 53 (Huber Loss). Validation MSE: 0.03878. Very strong but worse than 0.03531. Reverted.

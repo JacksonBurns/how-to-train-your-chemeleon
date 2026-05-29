@@ -319,7 +319,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=30,
+        max_epochs=20,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

@@ -308,7 +308,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=1,
+            patience=5,
         ),
         ModelCheckpoint(
             monitor="val/mse",
@@ -319,7 +319,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=10,
+        max_epochs=20,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

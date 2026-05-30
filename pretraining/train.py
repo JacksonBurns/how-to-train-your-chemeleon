@@ -28,7 +28,7 @@ from now import NOW
 from config import CHUNKS_PER_BATCH
 
 
-DROPOUT_FRACTION = 0.30
+DROPOUT_FRACTION = 0.51
 FEATURIZER = "RIGR"  # one of: "V2", "RIGR"
 
 
@@ -274,22 +274,23 @@ if __name__ == "__main__":
     mp = MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
-            d_h=2_048,
+            d_h=2_304,
             depth=4,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
     )
 
     model = MPNN(
         mp,
-        MeanAggregation(),
+        AggregationRegistry.get("norm")(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
             hidden_dim=1_024,
             n_layers=1,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
+        batch_norm=True,
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
         max_lr=0.001,
@@ -308,7 +309,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=1,
+            patience=5,
         ),
         ModelCheckpoint(
             monitor="val/mse",
@@ -319,7 +320,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=10,
+        max_epochs=20,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

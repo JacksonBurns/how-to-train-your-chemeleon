@@ -40,3 +40,5 @@
 2026-05-29_12-37-55: Experiment 45 (warmup=5). Validation MSE: 0.04049. Worse than 0.03591. Reverted.
 2026-05-29_13-46-16: Experiment 46 (MPNN width=2688, 20 epochs). Validation MSE: 0.03531. New best record! Kept.
 2026-05-29_18-21-54: Experiment 53 (Huber Loss). Validation MSE: 0.03878. Very strong but worse than 0.03531. Reverted.
+2026-05-29_19-30-45: Experiment 54 (NormAggregation). Validation MSE: 0.03318. Massive breakthrough. Kept.
+2026-05-29_21-01-47: Experiment 55 (MPNN d_h=2816). Crashed with OOM. Reverted.

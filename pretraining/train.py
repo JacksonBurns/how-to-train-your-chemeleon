@@ -11,7 +11,7 @@ from chemprop.conf import DEFAULT_ATOM_FDIM, DEFAULT_BOND_FDIM, DEFAULT_HIDDEN_D
 from chemprop.data import BatchMolGraph
 from chemprop.featurizers import BatchCuikMolGraph, CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
-from chemprop.nn import Aggregation, AggregationRegistry, RegressionFFN, metrics
+from chemprop.nn import NormAggregation, RegressionFFN, metrics
 from chemprop.nn.message_passing.base import _BondMessagePassingMixin, _MessagePassingBase
 from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 from lightning.pytorch import Trainer
@@ -28,7 +28,7 @@ from now import NOW
 from config import CHUNKS_PER_BATCH
 
 
-DROPOUT_FRACTION = 0.30
+DROPOUT_FRACTION = 0.50
 FEATURIZER = "RIGR"  # one of: "V2", "RIGR"
 
 
@@ -50,22 +50,6 @@ class RandomDropoutMSE(MSE):
             random_mask if mask is None else torch.logical_and(random_mask, mask)
         )  # i.e., include if both masks requests so
         super().update(preds, targets, mask, weights, lt_mask, gt_mask)
-
-
-@AggregationRegistry.register("mean")
-class MeanAggregation(Aggregation):
-    r"""Average the graph-level representation:
-
-    .. math::
-        \mathbf h = \frac{1}{|V|} \sum_{v \in V} \mathbf h_v
-    """
-
-    def forward(self, H: Tensor, batch: Tensor) -> Tensor:
-        index_torch = batch.unsqueeze(1).repeat(1, H.shape[1])
-        dim_size = batch.max().int() + 1
-        return torch.zeros(dim_size, H.shape[1], dtype=H.dtype, device=H.device).scatter_reduce_(
-            self.dim, index_torch, H, reduce="mean", include_self=False
-        )
 
 
 class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
@@ -276,18 +260,18 @@ if __name__ == "__main__":
             d_e=featurizer.bond_fdim,
             d_h=2_048,
             depth=4,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
     )
 
     model = MPNN(
         mp,
-        MeanAggregation(),
+        NormAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
             hidden_dim=1_024,
             n_layers=1,
-            activation=torch.nn.ReLU(),
+            activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
@@ -295,6 +279,7 @@ if __name__ == "__main__":
         max_lr=0.001,
         final_lr=0.0001,
         warmup_epochs=2,
+        batch_norm=True,
     )
     rank_zero_info(model)
 
@@ -308,7 +293,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=1,
+            patience=3,
         ),
         ModelCheckpoint(
             monitor="val/mse",
@@ -319,7 +304,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=10,
+        max_epochs=20,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

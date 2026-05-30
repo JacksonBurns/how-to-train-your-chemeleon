@@ -274,7 +274,7 @@ if __name__ == "__main__":
     mp = MultiweightMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
-            d_h=2_752,
+            d_h=2_048,
             depth=4,
             activation=torch.nn.GELU(),
     )
@@ -290,6 +290,7 @@ if __name__ == "__main__":
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
+        batch_norm=True,
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
         max_lr=0.001,

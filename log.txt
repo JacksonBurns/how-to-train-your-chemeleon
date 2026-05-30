@@ -45,3 +45,4 @@
 2026-05-29_21-01-47: Experiment 55 (MPNN d_h=2816). Crashed with OOM. Reverted.
 2026-05-29_21-02-19: Experiment 56 (MPNN depth=3). Validation MSE: 0.07619. Worse than depth 4. Reverted.
 2026-05-29_21-21-41: Experiment 57 (Batch Norm). Crashed with OOM. Reverted.
+2026-05-29_22-30-01: Experiment 58 (Batch Norm with d_h=2048). Validation MSE: 0.01895. Incredible breakthrough! Kept.

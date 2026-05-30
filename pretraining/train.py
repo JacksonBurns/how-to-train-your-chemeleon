@@ -290,7 +290,6 @@ if __name__ == "__main__":
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
-        batch_norm=True,
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
         max_lr=0.001,

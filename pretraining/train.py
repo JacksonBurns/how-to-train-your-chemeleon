@@ -275,7 +275,7 @@ if __name__ == "__main__":
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
             d_h=2_752,
-            depth=3,
+            depth=4,
             activation=torch.nn.GELU(),
     )
 

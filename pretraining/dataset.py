@@ -33,9 +33,19 @@ class ChempropChunkwiseZarrDataset(torch.utils.data.Dataset):
         start_idx = idx * self.items_per_batch
         stop_idx = min(start_idx + self.items_per_batch, self.n_rows)
 
-        features = self.featurizer(self.smiles[start_idx:stop_idx].tolist())
         targets = torch.tensor(self.z[start_idx:stop_idx, :], dtype=torch.float32)
         weights = torch.ones((targets.shape[0], 1), dtype=torch.float32)
+
+        try:
+            # historically this would never fail, but when we moved to cui-molmaker the RDKit version required there became
+            # misaligned with that needed for the feature calculation. This means that now some molecules pass featurization
+            # but fail here - this happens, like, once so we just skip the whole batch if it does
+            features = self.featurizer(self.smiles[start_idx:stop_idx].tolist())
+        except Exception as e:
+            with open("batch_errors.log", "a") as f:
+                f.write(f"Error processing batch {idx} on rank {torch.distributed.get_rank()} (rows {start_idx}-{stop_idx}): {e}\n")
+            features = self.featurizer([""] * (stop_idx - start_idx))  # dummy features
+            targets = torch.zeros_like(targets)
 
         return TrainingBatch(
             features,

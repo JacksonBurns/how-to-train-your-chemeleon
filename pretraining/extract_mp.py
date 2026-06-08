@@ -4,8 +4,7 @@ from pathlib import Path
 
 import torch
 
-from train import MPNN  # import from here to trigger other imports
-from config import MP_ACTIVATION
+from train import MPNN, MultiweightMessagePassing, RandomDropoutMSE  # import from here to trigger other imports
 
 
 try:
@@ -23,5 +22,5 @@ if out.exists():
 m = MPNN.load_from_checkpoint(ckpt, map_location="cpu")
 hps = dict(m.message_passing.hparams)
 hps.pop("cls")
-hps["activation"] = MP_ACTIVATION
+hps["activation"] = str(hps["activation"]).split("(")[0]
 torch.save({"hyper_params": hps, "state_dict": m.message_passing.state_dict()}, out)

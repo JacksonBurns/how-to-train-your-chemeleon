@@ -103,6 +103,7 @@ class GraphTransformerLayer(nn.Module):
         qkv_bias: bool = False,
         dropout: float = 0.1,
         act: str = "gelu",
+        update_edges: bool = True,
     ):
         super().__init__()
         if hidden_dim % num_heads != 0:
@@ -113,6 +114,7 @@ class GraphTransformerLayer(nn.Module):
         self.head_dim = hidden_dim // num_heads
         self.edge_in_dim = edge_in_dim
         self.gate = gate
+        self.update_edges = update_edges
 
         # Node Projections
         self.WQ = nn.Linear(node_in_dim, hidden_dim, bias=qkv_bias)
@@ -120,23 +122,28 @@ class GraphTransformerLayer(nn.Module):
         self.WV = nn.Linear(node_in_dim, hidden_dim, bias=qkv_bias)
         self.WO = nn.Linear(hidden_dim, node_in_dim, bias=True)
 
-        # Edge Projections
         if edge_in_dim is not None:
             self.WE_logits = nn.Linear(edge_in_dim, num_heads, bias=True)
             self.WE_value = nn.Linear(edge_in_dim, hidden_dim, bias=True)
-            self.WOe = nn.Linear(hidden_dim, edge_in_dim, bias=True)
-            
-            edge_ffn_hidden = max(hidden_dim, 2 * edge_in_dim)
-            self.ffn_e = MLP.build(input_dim=edge_in_dim, output_dim=edge_in_dim, hidden_dim=edge_ffn_hidden, dropout=dropout, activation=nn.GELU() if act == "gelu" else nn.ReLU())
             self.norm0e = nn.LayerNorm(edge_in_dim)
-            self.norm1e = nn.LayerNorm(edge_in_dim)
+            
+            # Conditionally instantiate edge update network
+            if update_edges:
+                self.WOe = nn.Linear(hidden_dim, edge_in_dim, bias=True)
+                edge_ffn_hidden = max(hidden_dim, 2 * edge_in_dim)
+                self.ffn_e = MLP.build(input_dim=edge_in_dim, output_dim=edge_in_dim, hidden_dim=edge_ffn_hidden, dropout=dropout, activation=nn.GELU() if act == "gelu" else nn.ReLU())
+                self.norm1e = nn.LayerNorm(edge_in_dim)
+            else:
+                self.WOe = None
+                self.ffn_e = None
+                self.norm1e = None
         else:
-            self.register_parameter("WE_logits", None)
-            self.register_parameter("WE_value", None)
-            self.register_parameter("WOe", None)
-            self.register_parameter("ffn_e", None)
-            self.register_parameter("norm0e", None)
-            self.register_parameter("norm1e", None)
+            self.WE_logits = None
+            self.WE_value = None
+            self.WOe = None
+            self.ffn_e = None
+            self.norm0e = None
+            self.norm1e = None
 
         self.norm1 = nn.LayerNorm(node_in_dim)
         self.norm2 = nn.LayerNorm(node_in_dim)
@@ -238,7 +245,7 @@ class GraphTransformerLayer(nn.Module):
         V_out = V1 + ffn_out
 
         # 8. Edge Updates
-        if self.edge_in_dim is None or E is None:
+        if self.edge_in_dim is None or E is None or not self.update_edges:
             E_out = E
         else:
             eij = logits_vec * E_val # [num_edges, num_heads, head_dim]
@@ -302,7 +309,8 @@ class GraphTransformer(MessagePassing, HyperparametersMixin):
                 gate=gate,
                 qkv_bias=qkv_bias,
                 dropout=dropout,
-            ) for _ in range(num_layers)
+                update_edges=(i < num_layers - 1)
+            ) for i in range(num_layers)
         ])
 
         # Readout Projection (to combine with extra descriptors V_d if they exist)

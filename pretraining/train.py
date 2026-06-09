@@ -180,11 +180,11 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(
         dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True
     )
-    
+
     mp = GraphTransformer(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=512,
+        d_h=256,
         num_heads=8,
         num_layers=10,
     )
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
-            hidden_dim=1_024,
+            hidden_dim=mp.d_h,
             n_layers=1,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),

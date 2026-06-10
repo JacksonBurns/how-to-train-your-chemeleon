@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from train import MPNN, GraphTransformer, RandomDropoutMSE  # import from here to trigger other imports
+from train import MPNN, AttentionAtomMessagePassing, RandomDropoutMSE  # import from here to trigger other imports
 
 
 try:

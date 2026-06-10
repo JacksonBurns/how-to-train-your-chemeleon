@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 from dataset import ChempropChunkwiseZarrDataset
 from now import NOW
 from config import CHUNKS_PER_BATCH
-from graph_transformer import GraphTransformer
+from attention_atom_mp import AttentionAtomMessagePassing
 
 
 DROPOUT_FRACTION = 0.70
@@ -181,12 +181,12 @@ if __name__ == "__main__":
         dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True
     )
 
-    mp = GraphTransformer(
+    mp = AttentionAtomMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
         d_h=256,
-        num_heads=8,
-        num_layers=10,
+        num_heads=4,
+        num_layers=6,
     )
 
     model = MPNN(

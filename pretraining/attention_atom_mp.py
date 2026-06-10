@@ -89,7 +89,7 @@ def scatter_softmax(src: Tensor, index: Tensor, dim_size: int) -> Tensor:
     return exp_src / (sum_exp_gathered + 1e-16)
 
 
-class GraphTransformerLayer(nn.Module):
+class AttentionAtomMessagePassingLayer(nn.Module):
     """
     Native PyTorch implementation of the GTConv layer from gt-pyg.
     """
@@ -262,7 +262,7 @@ class GraphTransformerLayer(nn.Module):
         return V_out, E_out
 
 
-class GraphTransformer(MessagePassing, HyperparametersMixin):
+class AttentionAtomMessagePassing(MessagePassing, HyperparametersMixin):
     """
     A Graph Transformer Message Passing block designed to drop-in to Chemprop's registry.
     It replaces the Directed Message Passing Neural Network (D-MPNN) encoder.
@@ -301,7 +301,7 @@ class GraphTransformer(MessagePassing, HyperparametersMixin):
 
         # Transformer Blocks
         self.layers = nn.ModuleList([
-            GraphTransformerLayer(
+            AttentionAtomMessagePassingLayer(
                 node_in_dim=d_h,
                 hidden_dim=d_h,
                 edge_in_dim=d_h if d_e else None,

@@ -286,6 +286,7 @@ class AttentionAtomMessagePassing(MessagePassing, HyperparametersMixin):
         self.save_hyperparameters(ignore=["V_d_transform", "graph_transform"])
         self.hparams["V_d_transform"] = V_d_transform
         self.hparams["graph_transform"] = graph_transform
+        self.hparams["cls"] = self.__class__
         
         self.d_h = d_h
         self.d_vd = d_vd

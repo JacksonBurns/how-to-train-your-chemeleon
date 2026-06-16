@@ -184,8 +184,8 @@ if __name__ == "__main__":
     mp = AttentionAtomMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=256,
-        num_heads=4,
+        d_h=512,
+        num_heads=8,
         num_layers=6,
     )
 

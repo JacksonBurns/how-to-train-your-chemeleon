@@ -221,7 +221,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=6,
+            patience=2,
         ),
         ModelCheckpoint(
             monitor="val/mse",

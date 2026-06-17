@@ -185,8 +185,10 @@ if __name__ == "__main__":
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
         d_h=512,
-        num_heads=8,
+        num_heads=4,
         num_layers=6,
+        tied_weights=True,
+        gate=True,
     )
 
     model = MPNN(

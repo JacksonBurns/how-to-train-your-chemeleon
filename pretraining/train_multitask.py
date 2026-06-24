@@ -215,14 +215,19 @@ if __name__ == "__main__":
     bl = BlockLogs()
 
     try:
-        input_dir = Path(sys.argv[1])
-        output_dir = Path(sys.argv[2])
+        desc_dir = Path(sys.argv[1])
+        fp_dir = Path(sys.argv[2])
+        output_dir = Path(sys.argv[3])
     except:
-        print("usage: python train_multitask.py <input_dir> <output_dir>")
+        print("usage: python train_multitask.py <descriptor_dir> <fingerprint_dir> <output_dir>")
         exit(1)
 
-    if not input_dir.exists():
-        print(f"Error: {input_dir} not found.")
+    if not desc_dir.exists():
+        print(f"Error: {desc_dir} not found.")
+        exit(1)
+
+    if not fp_dir.exists():
+        print(f"Error: {fp_dir} not found.")
         exit(1)
 
     output_dir.mkdir(exist_ok=True)
@@ -233,12 +238,12 @@ if __name__ == "__main__":
         with open("results.csv", "w") as f:
             f.write("run_name,val_mse\n")
 
-    train_desc_store = input_dir / "train_descriptor_rescaled.zarr"
-    val_desc_store = input_dir / "val_descriptor_rescaled.zarr"
-    train_fp_store = input_dir / "train_fingerprint_rescaled.zarr"
-    val_fp_store = input_dir / "val_fingerprint_rescaled.zarr"
-    train_smiles_file = input_dir / "train_smiles.parquet"
-    val_smiles_file = input_dir / "val_smiles.parquet"
+    train_desc_store = desc_dir / "train_rescaled.zarr"
+    val_desc_store = desc_dir / "val_rescaled.zarr"
+    train_fp_store = fp_dir / "train_rescaled.zarr"
+    val_fp_store = fp_dir / "val_rescaled.zarr"
+    train_smiles_file = desc_dir / "train_smiles.parquet"
+    val_smiles_file = desc_dir / "val_smiles.parquet"
 
     desc_z = zarr.open_array(train_desc_store, mode="r")
     fp_z = zarr.open_array(train_fp_store, mode="r")

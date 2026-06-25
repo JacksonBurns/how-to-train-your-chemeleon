@@ -21,6 +21,8 @@ from attention_atom_mp import AttentionAtomMessagePassing
 from multi_task_dataset import MultiTaskChunkwiseZarrDataset
 from now import NOW
 
+from train import PatchedCuikmolmakerMolGraphFeaturizer
+
 
 DROPOUT_FRACTION = 0.70
 
@@ -93,7 +95,7 @@ class MultiTaskModel(LightningModule):
         warmup_epochs: int = 2,
     ):
         super().__init__()
-      self.save_hyperparameters(ignore=['mp', 'predictor'])
+        self.save_hyperparameters(ignore=['mp', 'predictor'])
         self.mp = mp
         self.aggregator = NormAggregation()
         self.predictor = predictor
@@ -113,10 +115,10 @@ class MultiTaskModel(LightningModule):
         preds = self(batch["graph"])
         loss_fn = self.loss_fn if split == "train" else self.val_loss_fn
         loss, loss_dict = loss_fn(preds, batch["targets"], batch["weights"])
-        self.log(f"{split}/loss", loss, on_step=True, on_epoch=True, sync_dist=True, prog_bar=True)
+        self.log(f"{split}/loss", loss, on_step=True, on_epoch=True, sync_dist=True, prog_bar=True, batch_size=batch["targets"]["fingerprint"].shape[0])
         for task, val in loss_dict.items():
             if task != "total":
-                self.log(f"{split}/{task}_loss", val, on_step=True, on_epoch=True, sync_dist=True)
+                self.log(f"{split}/{task}_loss", val, on_step=True, on_epoch=True, sync_dist=True, batch_size=batch["targets"]["fingerprint"].shape[0])
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -143,85 +145,6 @@ class MultiTaskModel(LightningModule):
         }
 
 
-class PatchedCuikmolmakerMolGraphFeaturizer:
-    """Deferred import of cuik_molmaker — only needed at runtime."""
-
-    def __init__(self, feature_version: str):
-        import cuik_molmaker
-        from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
-
-        self._base = CuikmolmakerMolGraphFeaturizer(feature_version)
-        self.atom_fdim = self._base.atom_fdim
-        self.bond_fdim = self._base.bond_fdim
-
-    def __call__(
-        self,
-        smiles_list: list[str],
-        atom_features_extra: np.ndarray | None = None,
-        bond_features_extra: np.ndarray | None = None,
-    ) -> BatchCuikMolGraph:
-        import cuik_molmaker
-
-        base = self._base
-        offset_carbon, duplicate_edges, add_self_loop = False, True, False
-
-        (
-            atom_feats,
-            bond_feats,
-            edge_index,
-            rev_edge_index,
-            batch,
-        ) = cuik_molmaker.batch_mol_featurizer(
-            smiles_list,
-            base.atom_property_list_onehot,
-            base.atom_property_list_float,
-            base.bond_property_list,
-            base.add_h,
-            offset_carbon,
-            duplicate_edges,
-            add_self_loop,
-        )
-
-        empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
-        if empty_indices:
-            empty_indices_arr = np.array(empty_indices, dtype=np.int64)
-
-            if edge_index.size > 0:
-                shifts = np.searchsorted(empty_indices_arr, batch[edge_index], side="right")
-                edge_index += shifts
-
-            insert_positions = np.searchsorted(batch, empty_indices_arr)
-
-            dummy_atoms = np.zeros(
-                (len(empty_indices_arr), atom_feats.shape[1]), dtype=atom_feats.dtype
-            )
-            atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
-
-            batch = np.insert(batch, insert_positions, empty_indices_arr)
-
-        atom_feats = torch.from_numpy(atom_feats)
-        bond_feats = torch.from_numpy(bond_feats)
-        edge_index = torch.from_numpy(edge_index)
-        rev_edge_index = torch.from_numpy(rev_edge_index)
-        batch = torch.from_numpy(batch)
-
-        if atom_features_extra is not None:
-            atom_features_extra = torch.tensor(atom_features_extra, dtype=torch.float32)
-            atom_feats = torch.cat((atom_feats, atom_features_extra), dim=1)
-        if bond_features_extra is not None:
-            bond_features_extra = np.repeat(bond_features_extra, repeats=2, axis=0)
-            bond_features_extra = torch.tensor(bond_features_extra, dtype=torch.float32)
-            bond_feats = torch.cat((bond_feats, bond_features_extra), dim=1)
-
-        return BatchCuikMolGraph(
-            V=atom_feats,
-            E=bond_feats,
-            edge_index=edge_index,
-            rev_edge_index=rev_edge_index,
-            batch=batch,
-        )
-
-
 if __name__ == "__main__":
     bl = BlockLogs()
     FEATURIZER = "RIGR"
@@ -232,6 +155,8 @@ if __name__ == "__main__":
         output_dir = Path(sys.argv[3])
     except:
         print("usage: python train_multitask.py <descriptor_dir> <fingerprint_dir> <output_dir>")
+        print("")
+        print("note: ensure that rows_per_chunk is the same between Zarr arrays and that SMILES are the same!")
         exit(1)
 
     if not desc_dir.exists():
@@ -264,10 +189,6 @@ if __name__ == "__main__":
     rows_per_chunk = desc_z.chunks[0]
     del desc_z, fp_z
 
-    bytes_per_row = n_descriptors * 2
-    target_rows_for_1gb = (1024**3) // bytes_per_row
-    shard_multiplier = max(1, round(target_rows_for_1gb / rows_per_chunk))
-
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
@@ -294,8 +215,8 @@ if __name__ == "__main__":
     mp = AttentionAtomMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=8,
-        num_heads=2,
+        d_h=32*12,  # 384
+        num_heads=12,
         num_layers=6,
         tied_weights=True,
         gate=True,

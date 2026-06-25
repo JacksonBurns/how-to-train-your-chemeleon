@@ -28,11 +28,12 @@ fpgen = rdFingerprintGenerator.GetMorganGenerator(radius=RADIUS)
 def calculate(molecule: str | Mol) -> np.ndarray[DTYPE]:
     if not isinstance(molecule, Mol):
         molecule = Chem.MolFromSmiles(molecule)
+    out = np.full(FP_SIZE, np.nan, dtype=DTYPE)
     if molecule is None:
-        return np.full(FP_SIZE, np.nan, dtype=DTYPE)
+        return out
     try:
         fp = fpgen.GetCountFingerprintAsNumPy(molecule)
-        return fp.astype(DTYPE)
+        return np.where(fp.astype(bool), fp, out).astype(DTYPE)
     except Exception as e:
         smiles = "<invalid>"
         try:
@@ -40,7 +41,7 @@ def calculate(molecule: str | Mol) -> np.ndarray[DTYPE]:
         except:
             pass
         logger.warning(f"Morgan fingerprint failed for SMILES {smiles}: {repr(e)}")
-        return np.full(FP_SIZE, np.nan, dtype=DTYPE)
+        return out
 
 
 def _validate_smiles(smi: str) -> str:
@@ -67,7 +68,10 @@ if __name__ == "__main__":
             )
             exit(1)
 
-        df = pl.read_parquet(in_file)
+        df = (
+            pl.read_parquet(in_file)
+            .filter(pl.col("SMILES").str.len_chars() < 100)  # not needed, but for parity with osmordred
+        )
 
         smiles = df["SMILES"].to_list()
         with ProcessPoolExecutor(max_workers=os.cpu_count()) as ex:

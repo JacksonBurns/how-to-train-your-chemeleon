@@ -2,12 +2,11 @@ import os
 import sys
 from pathlib import Path
 
-import cuik_molmaker
 import numpy as np
 import polars
 import torch
 import zarr
-from chemprop.featurizers import BatchCuikMolGraph, CuikmolmakerMolGraphFeaturizer
+from chemprop.featurizers import BatchCuikMolGraph
 from chemprop.nn import NormAggregation, metrics
 from lightning.pytorch import LightningModule, Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -24,73 +23,6 @@ from now import NOW
 
 
 DROPOUT_FRACTION = 0.70
-FEATURIZER = "RIGR"
-
-
-class PatchedCuikmolmakerMolGraphFeaturizer(CuikmolmakerMolGraphFeaturizer):
-    def __call__(
-        self,
-        smiles_list: list[str],
-        atom_features_extra: np.ndarray | None = None,
-        bond_features_extra: np.ndarray | None = None,
-    ) -> BatchCuikMolGraph:
-        offset_carbon, duplicate_edges, add_self_loop = False, True, False
-
-        (
-            atom_feats,
-            bond_feats,
-            edge_index,
-            rev_edge_index,
-            batch,
-        ) = cuik_molmaker.batch_mol_featurizer(
-            smiles_list,
-            self.atom_property_list_onehot,
-            self.atom_property_list_float,
-            self.bond_property_list,
-            self.add_h,
-            offset_carbon,
-            duplicate_edges,
-            add_self_loop,
-        )
-
-        empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
-        if empty_indices:
-            empty_indices_arr = np.array(empty_indices, dtype=np.int64)
-
-            if edge_index.size > 0:
-                shifts = np.searchsorted(empty_indices_arr, batch[edge_index], side="right")
-                edge_index += shifts
-
-            insert_positions = np.searchsorted(batch, empty_indices_arr)
-
-            dummy_atoms = np.zeros(
-                (len(empty_indices_arr), atom_feats.shape[1]), dtype=atom_feats.dtype
-            )
-            atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
-
-            batch = np.insert(batch, insert_positions, empty_indices_arr)
-
-        atom_feats = torch.from_numpy(atom_feats)
-        bond_feats = torch.from_numpy(bond_feats)
-        edge_index = torch.from_numpy(edge_index)
-        rev_edge_index = torch.from_numpy(rev_edge_index)
-        batch = torch.from_numpy(batch)
-
-        if atom_features_extra is not None:
-            atom_features_extra = torch.tensor(atom_features_extra, dtype=torch.float32)
-            atom_feats = torch.cat((atom_feats, atom_features_extra), dim=1)
-        if bond_features_extra is not None:
-            bond_features_extra = np.repeat(bond_features_extra, repeats=2, axis=0)
-            bond_features_extra = torch.tensor(bond_features_extra, dtype=torch.float32)
-            bond_feats = torch.cat((bond_feats, bond_features_extra), dim=1)
-
-        return BatchCuikMolGraph(
-            V=atom_feats,
-            E=bond_feats,
-            edge_index=edge_index,
-            rev_edge_index=rev_edge_index,
-            batch=batch,
-        )
 
 
 class MultiTaskPredictor(torch.nn.Module):
@@ -134,20 +66,20 @@ class MultiTaskMSE(torch.nn.Module):
         weights: dict[str, torch.Tensor],
     ) -> dict[str, float]:
         losses = {}
+        total = torch.tensor(0.0, device=next(iter(preds.values())).device)
         for task in ("descriptor", "fingerprint"):
             p = preds[task]
             t = targets[task]
             w = weights[task]
             mask = (torch.rand_like(p) > self.dropout_fraction).bool()
-            masked = (p - t) ** 2
-            weighted = masked * w.squeeze(-1)
+            squared = (p - t) ** 2
+            weighted = squared * w
             task_loss = weighted.sum() / (mask.sum() + 1e-8)
-            # Normalize by output dimensionality for magnitude balancing
             task_loss = task_loss / p.shape[1]
             losses[task] = task_loss.item()
-        total = losses["descriptor"] + losses["fingerprint"]
+            total = total + task_loss
         losses["total"] = total.item()
-        return torch.tensor(total, device=next(iter(preds.values())).device), losses
+        return total, losses
 
 
 class MultiTaskModel(LightningModule):
@@ -161,7 +93,7 @@ class MultiTaskModel(LightningModule):
         warmup_epochs: int = 2,
     ):
         super().__init__()
-        self.save_hyperparameters()
+      self.save_hyperparameters(ignore=['mp', 'predictor'])
         self.mp = mp
         self.aggregator = NormAggregation()
         self.predictor = predictor
@@ -211,8 +143,88 @@ class MultiTaskModel(LightningModule):
         }
 
 
+class PatchedCuikmolmakerMolGraphFeaturizer:
+    """Deferred import of cuik_molmaker — only needed at runtime."""
+
+    def __init__(self, feature_version: str):
+        import cuik_molmaker
+        from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
+
+        self._base = CuikmolmakerMolGraphFeaturizer(feature_version)
+        self.atom_fdim = self._base.atom_fdim
+        self.bond_fdim = self._base.bond_fdim
+
+    def __call__(
+        self,
+        smiles_list: list[str],
+        atom_features_extra: np.ndarray | None = None,
+        bond_features_extra: np.ndarray | None = None,
+    ) -> BatchCuikMolGraph:
+        import cuik_molmaker
+
+        base = self._base
+        offset_carbon, duplicate_edges, add_self_loop = False, True, False
+
+        (
+            atom_feats,
+            bond_feats,
+            edge_index,
+            rev_edge_index,
+            batch,
+        ) = cuik_molmaker.batch_mol_featurizer(
+            smiles_list,
+            base.atom_property_list_onehot,
+            base.atom_property_list_float,
+            base.bond_property_list,
+            base.add_h,
+            offset_carbon,
+            duplicate_edges,
+            add_self_loop,
+        )
+
+        empty_indices = [i for i, s in enumerate(smiles_list) if s == ""]
+        if empty_indices:
+            empty_indices_arr = np.array(empty_indices, dtype=np.int64)
+
+            if edge_index.size > 0:
+                shifts = np.searchsorted(empty_indices_arr, batch[edge_index], side="right")
+                edge_index += shifts
+
+            insert_positions = np.searchsorted(batch, empty_indices_arr)
+
+            dummy_atoms = np.zeros(
+                (len(empty_indices_arr), atom_feats.shape[1]), dtype=atom_feats.dtype
+            )
+            atom_feats = np.insert(atom_feats, insert_positions, dummy_atoms, axis=0)
+
+            batch = np.insert(batch, insert_positions, empty_indices_arr)
+
+        atom_feats = torch.from_numpy(atom_feats)
+        bond_feats = torch.from_numpy(bond_feats)
+        edge_index = torch.from_numpy(edge_index)
+        rev_edge_index = torch.from_numpy(rev_edge_index)
+        batch = torch.from_numpy(batch)
+
+        if atom_features_extra is not None:
+            atom_features_extra = torch.tensor(atom_features_extra, dtype=torch.float32)
+            atom_feats = torch.cat((atom_feats, atom_features_extra), dim=1)
+        if bond_features_extra is not None:
+            bond_features_extra = np.repeat(bond_features_extra, repeats=2, axis=0)
+            bond_features_extra = torch.tensor(bond_features_extra, dtype=torch.float32)
+            bond_feats = torch.cat((bond_feats, bond_features_extra), dim=1)
+
+        return BatchCuikMolGraph(
+            V=atom_feats,
+            E=bond_feats,
+            edge_index=edge_index,
+            rev_edge_index=rev_edge_index,
+            batch=batch,
+        )
+
+
 if __name__ == "__main__":
     bl = BlockLogs()
+    FEATURIZER = "RIGR"
 
     try:
         desc_dir = Path(sys.argv[1])
@@ -282,8 +294,8 @@ if __name__ == "__main__":
     mp = AttentionAtomMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=512,
-        num_heads=4,
+        d_h=8,
+        num_heads=2,
         num_layers=6,
         tied_weights=True,
         gate=True,

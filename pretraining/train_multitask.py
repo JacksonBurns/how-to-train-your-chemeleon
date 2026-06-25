@@ -16,7 +16,6 @@ from lightning.pytorch.utilities import rank_zero_info
 from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
 
-from config import CHUNKS_PER_BATCH
 from attention_atom_mp import AttentionAtomMessagePassing
 from multi_task_dataset import MultiTaskChunkwiseZarrDataset
 from now import NOW
@@ -51,37 +50,74 @@ class MultiTaskPredictor(torch.nn.Module):
 
 
 class MultiTaskMSE(torch.nn.Module):
-    """Combined MSE loss with random dropout and magnitude balancing.
+    """
+    Computes uncertainty-weighted MSE for multiple tasks containing missing data.
+    Assumes targets are already normalized (mean=0, var=1).
     
-    Divides each task's loss by its output dimensionality so that the two
-    losses are of similar magnitude regardless of descriptor/fingerprint count.
+    Based on homoscedastic task uncertainty: 
+    Kendall et al. (2018) "Multi-Task Learning Using Uncertainty to Weigh Losses..."
+    Paper: https://arxiv.org/abs/1705.07115
     """
 
     def __init__(self, dropout_fraction: float = DROPOUT_FRACTION):
         super().__init__()
         self.dropout_fraction = dropout_fraction
+        
+        # Initialize log-variances (s) for each task.
+        # Initializing at 0.0 means exp(-0) = 1, so the initial weighting 
+        # is just 0.5 * MSE, behaving closely to an unweighted sum at step 0.
+        self.log_vars = torch.nn.ParameterDict({
+            "descriptor": torch.nn.Parameter(torch.tensor(0.0)),
+            "fingerprint": torch.nn.Parameter(torch.tensor(0.0))
+        })
 
     def forward(
         self,
         preds: dict[str, torch.Tensor],
         targets: dict[str, torch.Tensor],
         weights: dict[str, torch.Tensor],
-    ) -> dict[str, float]:
+    ) -> tuple[torch.Tensor, dict[str, float]]:
+        
         losses = {}
-        total = torch.tensor(0.0, device=next(iter(preds.values())).device)
+        total_loss = torch.tensor(0.0, device=next(iter(preds.values())).device)
+
         for task in ("descriptor", "fingerprint"):
             p = preds[task]
             t = targets[task]
             w = weights[task]
-            mask = (torch.rand_like(p) > self.dropout_fraction).bool()
-            squared = (p - t) ** 2
-            weighted = squared * w
-            task_loss = weighted.sum() / (mask.sum() + 1e-8)
-            task_loss = task_loss / p.shape[1]
-            losses[task] = task_loss.item()
-            total = total + task_loss
-        losses["total"] = total.item()
-        return total, losses
+
+            # 1. Safely handle missing data (NaNs) in the targets
+            t_safe = torch.nan_to_num(t, nan=0.0)
+
+            # 2. Create the random dropout mask
+            dropout_mask = (torch.rand_like(p) > self.dropout_fraction).float()
+
+            # 3. Combine the dataset validity weights and the dropout mask
+            combined_mask = w * dropout_mask
+
+            # 4. Compute the masked squared error
+            squared_error = (p - t_safe) ** 2
+            masked_error = squared_error * combined_mask
+
+            # 5. Calculate the base Mean Squared Error (MSE)
+            task_mse = masked_error.sum() / (combined_mask.sum() + 1e-8)
+
+            # 6. Apply Homoscedastic Task Uncertainty Weighting
+            # Formula: L = 0.5 * exp(-s) * Loss + 0.5 * s
+            log_var = self.log_vars[task]
+            task_weighted_loss = 0.5 * torch.exp(-log_var) * task_mse + 0.5 * log_var
+
+            # Store metrics. It is highly recommended to track both the raw MSE 
+            # and the log_vars during training to ensure they don't diverge.
+            losses[f"{task}_raw_mse"] = task_mse.item()
+            losses[f"{task}_weighted"] = task_weighted_loss.item()
+            losses[f"{task}_log_var"] = log_var.item() 
+            
+            total_loss = total_loss + task_weighted_loss
+
+        losses["total"] = total_loss.item()
+        
+        return total_loss, losses
 
 
 class MultiTaskModel(LightningModule):
@@ -95,16 +131,14 @@ class MultiTaskModel(LightningModule):
         warmup_epochs: int = 2,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=['mp', 'predictor'])
+        self.save_hyperparameters()
         self.mp = mp
         self.aggregator = NormAggregation()
         self.predictor = predictor
         self.loss_fn = MultiTaskMSE()
         self.val_loss_fn = MultiTaskMSE(dropout_fraction=0.0)
-        self.metrics = {
-            "descriptor": metrics.MSE(),
-            "fingerprint": metrics.MSE(),
-        }
+        # force the validation loss to use the training loss's learnable parameters
+        self.val_loss_fn.log_vars = self.loss_fn.log_vars
 
     def forward(self, graph: BatchCuikMolGraph) -> dict[str, torch.Tensor]:
         hidden = self.mp(graph)
@@ -232,8 +266,8 @@ if __name__ == "__main__":
     model = MultiTaskModel(
         mp,
         predictor,
-        init_lr=0.0001,
-        max_lr=0.001,
+        init_lr=0.00001,
+        max_lr=0.0005,
         final_lr=0.0001,
         warmup_epochs=2,
     )
@@ -260,7 +294,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=20,
+        max_epochs=40,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,
@@ -276,9 +310,9 @@ if __name__ == "__main__":
         ckpt_path=restart_ckpt,
         weights_only=restart_ckpt is None,
     )
-    ckpt_path = trainer.checkpoint_callback.best_model_path
+    ckpt_path = Path(trainer.checkpoint_callback.best_model_path)
 
-    model = MultiTaskModel.load_from_checkpoint(ckpt_path)
+    model = MultiTaskModel.load_from_checkpoint(ckpt_path, weights_only=False)
     val_metrics = trainer.validate(model, val_dataloader, verbose=False)
     rank_zero_info(f"Best model file: {ckpt_path}")
     rank_zero_info(f"Best model validation loss: {val_metrics[0]['val/loss']:.5f}")
@@ -286,3 +320,5 @@ if __name__ == "__main__":
     if trainer.global_rank == 0:
         with open("results.csv", "a") as f:
             f.write(f"{output_dir.name},{val_metrics[0]['val/loss']:.5f}\n")
+    
+    torch.save({"hyper_params": dict(model.mp.hparams), "state_dict": model.mp.state_dict()}, ckpt_path.parent.resolve() / (ckpt_path.stem + "_mp.pt"))

@@ -17,6 +17,7 @@ from rdkit.rdBase import BlockLogs
 from torch.utils.data import DataLoader
 
 from attention_atom_mp import AttentionAtomMessagePassing
+from chemprop.nn.message_passing import BondMessagePassing
 from multi_task_dataset import MultiTaskChunkwiseZarrDataset
 from now import NOW
 
@@ -246,19 +247,17 @@ if __name__ == "__main__":
         dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True
     )
 
-    mp = AttentionAtomMessagePassing(
+    mp = BondMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=32*12,  # 384
-        num_heads=12,
-        num_layers=6,
-        tied_weights=True,
-        gate=True,
+        d_h=2_048,
+        depth=6,
+        activation="leakyrelu",
     )
 
     predictor = MultiTaskPredictor(
         input_dim=mp.output_dim,
-        hidden_dim=mp.d_h,
+        hidden_dim=mp.output_dim,
         n_descriptors=n_descriptors,
         n_fingerprints=n_fingerprints,
     )
@@ -267,9 +266,9 @@ if __name__ == "__main__":
         mp,
         predictor,
         init_lr=0.00001,
-        max_lr=0.0005,
+        max_lr=0.0001,
         final_lr=0.0001,
-        warmup_epochs=2,
+        warmup_epochs=4,
     )
     rank_zero_info(model)
 
@@ -315,10 +314,12 @@ if __name__ == "__main__":
     model = MultiTaskModel.load_from_checkpoint(ckpt_path, weights_only=False)
     val_metrics = trainer.validate(model, val_dataloader, verbose=False)
     rank_zero_info(f"Best model file: {ckpt_path}")
-    rank_zero_info(f"Best model validation loss: {val_metrics[0]['val/loss']:.5f}")
+    rank_zero_info(f"Best model validation loss: {val_metrics[0]['val/loss_epoch']:.5f}")
 
     if trainer.global_rank == 0:
         with open("results.csv", "a") as f:
-            f.write(f"{output_dir.name},{val_metrics[0]['val/loss']:.5f}\n")
+            f.write(f"{output_dir.name},{val_metrics[0]['val/loss_epoch']:.5f}\n")
     
-    torch.save({"hyper_params": dict(model.mp.hparams), "state_dict": model.mp.state_dict()}, ckpt_path.parent.resolve() / (ckpt_path.stem + "_mp.pt"))
+    hps = dict(model.mp.hparams)
+    hps.pop("cls")
+    torch.save({"hyper_params": hps, "state_dict": model.mp.state_dict()}, ckpt_path.parent.resolve() / (ckpt_path.stem + "_mp.pt"))

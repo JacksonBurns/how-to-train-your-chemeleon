@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 from dataset import ChempropChunkwiseZarrDataset
 from now import NOW
 from config import CHUNKS_PER_BATCH
-from attention_atom_mp import AttentionAtomMessagePassing
+from minimol_message_passing import MinimolMessagePassing
 
 
 DROPOUT_FRACTION = 0.70
@@ -181,14 +181,12 @@ if __name__ == "__main__":
         dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True
     )
 
-    mp = AttentionAtomMessagePassing(
+    mp = MinimolMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
         d_h=512,
-        num_heads=16,
-        num_layers=6,
-        tied_weights=True,
-        gate=True,
+        depth=8,
+        backbone_type="gine",
     )
 
     model = MPNN(
@@ -197,15 +195,15 @@ if __name__ == "__main__":
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
-            hidden_dim=mp.d_h,
+            hidden_dim=mp.output_dim,
             n_layers=1,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.0001,
-        max_lr=0.001,
-        final_lr=0.0001,
+        max_lr=0.0002,
+        final_lr=0.00005,
         warmup_epochs=2,
         batch_norm=False,
     )
@@ -221,7 +219,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=2,
+            patience=6,
         ),
         ModelCheckpoint(
             monitor="val/mse",
@@ -232,7 +230,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=20,
+        max_epochs=100,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

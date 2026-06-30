@@ -250,7 +250,7 @@ if __name__ == "__main__":
     )
     ckpt_path = trainer.checkpoint_callback.best_model_path
     # get the validation performance
-    model = MPNN.load_from_checkpoint(ckpt_path)
+    model = MPNN.load_from_checkpoint(ckpt_path, map_location="cpu")
     val_metrics = trainer.validate(model, val_dataloader, verbose=False)
     rank_zero_info(f"Best model file: {ckpt_path}")
     rank_zero_info(f"Best model validation mse: {val_metrics[0]['val/mse']:.5f}")

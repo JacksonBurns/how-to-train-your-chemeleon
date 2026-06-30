@@ -184,9 +184,9 @@ if __name__ == "__main__":
     mp = MinimolMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=512,
+        d_h=1_024,
         depth=8,
-        backbone_type="gine",
+        backbone_type="mpnn++",
     )
 
     model = MPNN(
@@ -201,8 +201,8 @@ if __name__ == "__main__":
             criterion=RandomDropoutMSE(),
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
-        init_lr=0.0001,
-        max_lr=0.0002,
+        init_lr=0.00001,
+        max_lr=0.00002,
         final_lr=0.00005,
         warmup_epochs=2,
         batch_norm=False,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from train import MPNN, AttentionAtomMessagePassing, RandomDropoutMSE  # import from here to trigger other imports
+from train import MPNN, MinimolMessagePassing, RandomDropoutMSE  # import from here to trigger other imports
 
 
 try:

@@ -23,6 +23,7 @@ from dataset import ChempropChunkwiseZarrDataset
 from now import NOW
 from config import CHUNKS_PER_BATCH
 from minimol_message_passing import MinimolMessagePassing
+from max_agg import MaxAggregation
 
 
 DROPOUT_FRACTION = 0.70
@@ -191,7 +192,7 @@ if __name__ == "__main__":
 
     model = MPNN(
         mp,
-        NormAggregation(),
+        MaxAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
@@ -199,13 +200,14 @@ if __name__ == "__main__":
             n_layers=1,
             activation=torch.nn.GELU(),
             criterion=RandomDropoutMSE(),
+            dropout=0.1,
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=0.00001,
         max_lr=0.00002,
         final_lr=0.00005,
         warmup_epochs=2,
-        batch_norm=False,
+        batch_norm=True,
     )
     rank_zero_info(model)
 
@@ -219,7 +221,7 @@ if __name__ == "__main__":
             monitor="val/mse",
             mode="min",
             verbose=False,
-            patience=6,
+            patience=2,
         ),
         ModelCheckpoint(
             monitor="val/mse",
@@ -230,7 +232,7 @@ if __name__ == "__main__":
     ]
     callbacks[1].STARTING_VERSION = 0
     trainer = Trainer(
-        max_epochs=100,
+        max_epochs=10,
         logger=tensorboard_logger,
         log_every_n_steps=1,
         enable_checkpointing=True,

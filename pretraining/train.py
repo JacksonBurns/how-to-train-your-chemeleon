@@ -9,7 +9,7 @@ import torch
 import zarr
 from chemprop.featurizers import BatchCuikMolGraph, CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
-from chemprop.nn import NormAggregation, RegressionFFN, metrics
+from chemprop.nn import NormAggregation, RegressionFFN, metrics, BondMessagePassing
 from chemprop.nn.metrics import MSE, LossFunctionRegistry, MetricRegistry
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
@@ -22,12 +22,10 @@ from torch.utils.data import DataLoader
 from dataset import ChempropChunkwiseZarrDataset
 from now import NOW
 from config import CHUNKS_PER_BATCH
-from minimol_message_passing import MinimolMessagePassing
-from max_agg import MaxAggregation
 
 
-DROPOUT_FRACTION = 0.70
-FEATURIZER = "RIGR"  # one of: "V2", "RIGR"
+DROPOUT_FRACTION = 0.00
+FEATURIZER = "V2"  # one of: "V2", "RIGR"
 
 
 @LossFunctionRegistry.register("rdmse")
@@ -182,32 +180,28 @@ if __name__ == "__main__":
         dataset=val_dataset, batch_size=None, num_workers=2, persistent_workers=True
     )
 
-    mp = MinimolMessagePassing(
+    mp = BondMessagePassing(
         d_v=featurizer.atom_fdim,
         d_e=featurizer.bond_fdim,
-        d_h=1_024,
-        depth=8,
-        backbone_type="mpnn++",
+        d_h=2_048,
+        depth=6,
+        activation=torch.nn.ReLU(),
     )
 
     model = MPNN(
         mp,
-        MaxAggregation(),
+        NormAggregation(),
         predictor=RegressionFFN(
             n_tasks=n_features,
             input_dim=mp.output_dim,
             hidden_dim=mp.output_dim,
             n_layers=1,
-            activation=torch.nn.GELU(),
+            activation=torch.nn.ReLU(),
             criterion=RandomDropoutMSE(),
-            dropout=0.1,
         ),
         metrics=[metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
-        init_lr=0.00001,
-        max_lr=0.00002,
-        final_lr=0.00005,
         warmup_epochs=2,
-        batch_norm=True,
+        batch_norm=False,
     )
     rank_zero_info(model)
 

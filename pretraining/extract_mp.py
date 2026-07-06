@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from train import MPNN, MinimolMessagePassing, RandomDropoutMSE  # import from here to trigger other imports
+from train import MPNN, RandomDropoutMSE  # import from here to trigger other imports
 
 
 try:
@@ -22,5 +22,5 @@ if out.exists():
 m = MPNN.load_from_checkpoint(ckpt, map_location="cpu")
 hps = dict(m.message_passing.hparams)
 hps.pop("cls")
-# hps["activation"] = str(hps["activation"]).split("(")[0]  <-- new one only uses GELU, not configurable (but could be)
+hps["activation"] = str(hps["activation"]).split("(")[0]
 torch.save({"hyper_params": hps, "state_dict": m.message_passing.state_dict()}, out)

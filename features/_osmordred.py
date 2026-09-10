@@ -9,7 +9,7 @@ from get_chunksize import get_chunk_rows
 
 logger = logging.getLogger(__name__)
 
-DTYPE = np.float32
+DTYPE = np.float16
 DESCRIPTOR_COUNT = 3585
 DESCRIPTOR_NAMES = (
     "ABCIndex_1",
@@ -3664,7 +3664,10 @@ _DESCRIPTOR_SIZES = {
 
 def _safe_calculate(func, molecule: Mol, *args):
     try:
-        return np.array(func(molecule, *args), dtype=DTYPE)
+        # some descriptors use a linear solver. if it fails, it just returns a 5-vector of NaNs. we want to catch that and return a vector of NaNs of the correct size instead.
+        result = np.array(func(molecule, *args), dtype=DTYPE)
+        assert result.shape == (_DESCRIPTOR_SIZES[func.__name__[4:]],)
+        return result
     except Exception as e:
         key = func.__name__[4:]
         smiles = "<invalid>"

@@ -201,7 +201,7 @@ if __name__ == "__main__":
         store=train_zarr,
         shape=(len(train_chunks) * rows_per_chunk, input_zarr.shape[1]),
         chunks=input_zarr.chunks,
-        dtype=np.float32,
+        dtype=np.float16,
         compressors=None,  # disable compression for faster access during training
         fill_value=np.nan,
     )
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         store=val_zarr,
         shape=(len(val_chunks) * rows_per_chunk, input_zarr.shape[1]),
         chunks=input_zarr.chunks,
-        dtype=np.float32,
+        dtype=np.float16,
         compressors=None,  # disable compression for faster access during training
         fill_value=np.nan,
     )

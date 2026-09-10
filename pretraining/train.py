@@ -5,9 +5,8 @@ from pathlib import Path
 import polars
 import torch
 import zarr
-from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
-from chemprop.featurizers.atom import RIGRAtomFeaturizer, MultiHotAtomFeaturizer
-from chemprop.featurizers.bond import RIGRBondFeaturizer, MultiHotBondFeaturizer
+from torch import nn
+from chemprop.featurizers import CuikmolmakerMolGraphFeaturizer
 from chemprop.models import MPNN
 from chemprop.nn import BondMessagePassing, NormAggregation, RegressionFFN, metrics
 from lightning.pytorch import Trainer
@@ -22,12 +21,10 @@ from config import (
     EPOCHS,
     FEATURIZER,
     FINAL_LEARNING_RATE,
-    FNN_ACTIVATION,
     FNN_HIDDEN_LAYERS,
     FNN_HIDDEN_SIZE,
     INITIAL_LEARNING_RATE,
     MAXIMUM_LEARNING_RATE,
-    MP_ACTIVATION,
     MP_DEPTH,
     MP_HIDDEN_SIZE,
     PATIENCE,
@@ -66,12 +63,10 @@ if __name__ == "__main__":
         f.write(f"EPOCHS: {EPOCHS}\n")
         f.write(f"FEATURIZER: {FEATURIZER}\n")
         f.write(f"FINAL_LEARNING_RATE: {FINAL_LEARNING_RATE}\n")
-        f.write(f"FNN_ACTIVATION: {FNN_ACTIVATION}\n")
         f.write(f"FNN_HIDDEN_LAYERS: {FNN_HIDDEN_LAYERS}\n")
         f.write(f"FNN_HIDDEN_SIZE: {FNN_HIDDEN_SIZE}\n")
         f.write(f"INITIAL_LEARNING_RATE: {INITIAL_LEARNING_RATE}\n")
         f.write(f"MAXIMUM_LEARNING_RATE: {MAXIMUM_LEARNING_RATE}\n")
-        f.write(f"MP_ACTIVATION: {MP_ACTIVATION}\n")
         f.write(f"MP_DEPTH: {MP_DEPTH}\n")
         f.write(f"MP_HIDDEN_SIZE: {MP_HIDDEN_SIZE}\n")
         f.write(f"PATIENCE: {PATIENCE}\n")
@@ -89,15 +84,7 @@ if __name__ == "__main__":
     train_smiles = polars.read_parquet(train_smiles_file)["SMILES"].to_list()
     val_smiles = polars.read_parquet(val_smiles_file)["SMILES"].to_list()
 
-    if FEATURIZER.upper() == "RIGR":
-        atom_featurizer = RIGRAtomFeaturizer()
-        bond_featurizer = RIGRBondFeaturizer()
-    elif FEATURIZER.upper() == "DEFAULT":
-        atom_featurizer = MultiHotAtomFeaturizer.v2()
-        bond_featurizer = MultiHotBondFeaturizer()
-    else:
-        raise ValueError(f"Valid featurizers are 'RIGR' and 'DEFAULT', got {FEATURIZER}")
-    featurizer = SimpleMoleculeMolGraphFeaturizer(atom_featurizer=atom_featurizer, bond_featurizer=bond_featurizer)
+    featurizer = CuikmolmakerMolGraphFeaturizer(atom_featurizer_mode="RIGR")
 
     train_dataset = ChempropChunkwiseZarrDataset(
         train_smiles,
@@ -119,11 +106,11 @@ if __name__ == "__main__":
             d_e=featurizer.bond_fdim,
             d_h=MP_HIDDEN_SIZE,
             depth=MP_DEPTH,
-            activation=MP_ACTIVATION,
+            activation=nn.SiLU(),
         ),
         NormAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=FNN_ACTIVATION, criterion=RandomDropoutMSE()
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=nn.SiLU(), criterion=RandomDropoutMSE()
         ),
         metrics=[RandomDropoutMSE(), metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=INITIAL_LEARNING_RATE,
@@ -160,6 +147,7 @@ if __name__ == "__main__":
         enable_checkpointing=True,
         check_val_every_n_epoch=1,
         callbacks=callbacks,
+        precision=16,
     )
     trainer.fit(model, train_dataloader, val_dataloader)
     ckpt_path = trainer.checkpoint_callback.best_model_path

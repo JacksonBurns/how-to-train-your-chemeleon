@@ -1,4 +1,5 @@
 import sys
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from config import (
 )
 from dataset import ChempropChunkwiseZarrDataset
 from random_dropout_mse import RandomDropoutMSE
+from moe_mpnn import AdaptiveMixtureMessagePassing
 
 
 NOW = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -101,16 +103,17 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=None, shuffle=False, num_workers=4, persistent_workers=True)
 
     model = MPNN(
-        BondMessagePassing(
+        AdaptiveMixtureMessagePassing(
             d_v=featurizer.atom_fdim,
             d_e=featurizer.bond_fdim,
             d_h=MP_HIDDEN_SIZE,
             depth=MP_DEPTH,
-            activation=nn.SiLU(),
+            activation=nn.GELU(),
+            n_experts=4,
         ),
         NormAggregation(),
         predictor=RegressionFFN(
-            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=nn.SiLU(), criterion=RandomDropoutMSE()
+            n_tasks=n_features, input_dim=MP_HIDDEN_SIZE, hidden_dim=FNN_HIDDEN_SIZE, n_layers=FNN_HIDDEN_LAYERS, activation=nn.GELU(), criterion=RandomDropoutMSE()
         ),
         metrics=[RandomDropoutMSE(), metrics.MSE(), metrics.MAE(), metrics.R2Score(), metrics.RMSE()],
         init_lr=INITIAL_LEARNING_RATE,
@@ -140,6 +143,10 @@ if __name__ == "__main__":
         ),
     ]
     callbacks[1].STARTING_VERSION = 0
+    resume_from_checkpoint = None
+    if os.environ.get("RESUME_CHECKPOINT", None) is not None:
+        resume_from_checkpoint = os.environ.get("RESUME_CHECKPOINT")
+        print(f"Resuming from checkpoint: {resume_from_checkpoint}")
     trainer = Trainer(
         max_epochs=EPOCHS,
         logger=tensorboard_logger,
@@ -149,7 +156,7 @@ if __name__ == "__main__":
         callbacks=callbacks,
         precision=16,
     )
-    trainer.fit(model, train_dataloader, val_dataloader)
+    trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=resume_from_checkpoint, weights_only=resume_from_checkpoint is None)
     ckpt_path = trainer.checkpoint_callback.best_model_path
     print(f"Reloading best model from checkpoint file: {ckpt_path}")
     model = model.__class__.load_from_checkpoint(ckpt_path, map_location="cpu")
